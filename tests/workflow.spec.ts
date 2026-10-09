@@ -212,6 +212,14 @@ for (const width of [1440, 768, 390, 320]) {
     await page.goto('/')
     await expect(page.locator('.vocabulary-row')).toHaveCount(42)
     await page.evaluate(() => document.fonts.ready)
+    await expect(page.getByLabel('English entry 1', { exact: true })).toHaveCSS(
+      'font-size',
+      '16px',
+    )
+    await expect(page.getByLabel('German entry 1', { exact: true })).toHaveCSS(
+      'font-size',
+      '16px',
+    )
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -236,6 +244,10 @@ for (const width of [1440, 768, 390, 320]) {
     await page.getByRole('button', { name: 'Practice', exact: true }).click()
     await page.getByRole('button', { name: 'Start practice' }).click()
     await expect(page.getByLabel('In English', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('In English', { exact: true })).toHaveCSS(
+      'font-size',
+      '20px',
+    )
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -249,6 +261,10 @@ for (const width of [1440, 768, 390, 320]) {
     await page.getByText('Multiple choice', { exact: true }).click()
     await page.getByRole('button', { name: 'Start practice' }).click()
     await expect(page.locator('.answer-choice')).toHaveCount(4)
+    await expect(page.locator('.answer-choice').first()).toHaveCSS(
+      'font-size',
+      '18px',
+    )
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
