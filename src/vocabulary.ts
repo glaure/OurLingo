@@ -2,6 +2,8 @@ export interface Entry {
   english: string
   german: string
   example: string | null
+  origin?: 'word-file'
+  translationSource?: 'suggested' | 'parent'
 }
 
 export interface VocabularyUnit {
@@ -15,6 +17,88 @@ export interface VocabularyUnit {
 }
 
 export const storageKey = 'ourlingo.more-1-unit-1.v1'
+export const libraryStorageKey = 'ourlingo.library.v1'
+export const bundledUnitFiles = [
+  { book: 'MORE! 1', unit: 2, file: 'more-1-unit-2.json' },
+  { book: 'MORE! 2', unit: 1, file: 'more-2-unit-1.json' },
+  { book: 'MORE! 2', unit: 2, file: 'more-2-unit-2.json' },
+  { book: 'MORE! 2', unit: 3, file: 'more-2-unit-3.json' },
+] as const
+
+export interface VocabularyLibrary {
+  schemaVersion: 1
+  units: VocabularyUnit[]
+  bundledUnitKeys?: string[]
+}
+
+export function unitKey(unit: Pick<VocabularyUnit, 'book' | 'unit'>): string {
+  return `${unit.book}:${unit.unit}`
+}
+
+export function isVocabularyLibrary(
+  value: unknown,
+): value is VocabularyLibrary {
+  if (!value || typeof value !== 'object') return false
+  const library = value as Partial<VocabularyLibrary>
+  if (library.schemaVersion !== 1 || !Array.isArray(library.units)) return false
+  if (
+    library.bundledUnitKeys !== undefined &&
+    (!Array.isArray(library.bundledUnitKeys) ||
+      !library.bundledUnitKeys.every((key) => typeof key === 'string') ||
+      new Set(library.bundledUnitKeys).size !== library.bundledUnitKeys.length)
+  )
+    return false
+  if (!library.units.every(isVocabularyUnit)) return false
+  if (
+    library.units.some(
+      (unit) =>
+        unit.reviewStatus === 'approved' && validateEntries(unit.entries),
+    )
+  )
+    return false
+  return new Set(library.units.map(unitKey)).size === library.units.length
+}
+
+export function upsertUnit(
+  library: VocabularyLibrary,
+  unit: VocabularyUnit,
+): VocabularyLibrary {
+  const units = library.units.filter(
+    (existing) => unitKey(existing) !== unitKey(unit),
+  )
+  return {
+    ...library,
+    schemaVersion: 1,
+    units: [...units, unit].sort(
+      (first, second) =>
+        first.book.localeCompare(second.book) || first.unit - second.unit,
+    ),
+  }
+}
+
+export function mergeBundledUnits(
+  library: VocabularyLibrary,
+  bundled: VocabularyUnit[],
+): VocabularyLibrary {
+  const installed = new Set(
+    library.bundledUnitKeys ?? [unitKey({ book: 'MORE! 1', unit: 1 })],
+  )
+  let merged: VocabularyLibrary = {
+    ...library,
+    bundledUnitKeys: [...installed],
+  }
+  for (const unit of bundled) {
+    const key = unitKey(unit)
+    if (installed.has(key)) continue
+    const existing = merged.units.find((item) => unitKey(item) === key)
+    if (!existing) merged = upsertUnit(merged, unit)
+    else if (existing.reviewStatus === 'pending' && !existing.entries.length) {
+      merged = upsertUnit(merged, { ...unit, title: existing.title })
+    }
+    installed.add(key)
+  }
+  return { ...merged, bundledUnitKeys: [...installed] }
+}
 
 export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
   if (!value || typeof value !== 'object') return false
@@ -28,7 +112,7 @@ export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
     typeof unit.source === 'string' &&
     (unit.reviewStatus === 'pending' || unit.reviewStatus === 'approved') &&
     Array.isArray(unit.entries) &&
-    unit.entries.length > 0 &&
+    (unit.entries.length > 0 || unit.reviewStatus === 'pending') &&
     unit.entries.every((entry: unknown) => {
       if (!entry || typeof entry !== 'object') return false
       const item = entry as Partial<Entry>
@@ -37,7 +121,11 @@ export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
         !!item.english.trim() &&
         typeof item.german === 'string' &&
         !!item.german.trim() &&
-        (item.example === null || typeof item.example === 'string')
+        (item.example === null || typeof item.example === 'string') &&
+        (item.origin === undefined || item.origin === 'word-file') &&
+        (item.translationSource === undefined ||
+          item.translationSource === 'suggested' ||
+          item.translationSource === 'parent')
       )
     })
   )
@@ -66,6 +154,19 @@ export function normalizeAnswer(answer: string): string {
     .replace(/\s+/g, ' ')
 }
 
+function optionalAnswerForms(text: string): string[] {
+  const group = text.match(/\(([^()]*)\)/)
+  if (!group || group[1].startsWith('=') || /^pl\.?\s+/i.test(group[1]))
+    return [text]
+  const parts = group[1].split('/').map((part) => {
+    const prefix = part.trim()
+    return /^[\p{L}]+-$/u.test(prefix) ? prefix.slice(0, -1) : prefix
+  })
+  return ['', ...parts].flatMap((part) =>
+    optionalAnswerForms(text.replace(group[0], part)),
+  )
+}
+
 export function acceptedAnswers(
   entry: Entry,
   direction: 'english' | 'german',
@@ -74,6 +175,9 @@ export function acceptedAnswers(
   const variants = text
     .split(/[;,]/)
     .map((part) => part.trim())
+    .map((part) =>
+      direction === 'german' ? part.replace(/^hier:\s*/i, '') : part,
+    )
     .filter(Boolean)
   const answers: string[] = []
   for (const variant of variants) {
@@ -84,12 +188,12 @@ export function acceptedAnswers(
       .trim()
     if (withoutParentheses && withoutParentheses !== variant)
       answers.push(withoutParentheses)
-    const optional = variant.match(/^(.*?)\(([^=)]*)\)(.*)$/)
-    if (optional) {
-      const prefix = /^[a-zäöüß]+-$/u.test(optional[2])
-        ? optional[2].slice(0, -1)
-        : optional[2]
-      answers.push(`${optional[1]}${prefix}${optional[3]}`.trim())
+    answers.push(...optionalAnswerForms(variant))
+    const alias = variant.match(/\(([^()]+)\)/)?.[1]
+    if (direction === 'english' && alias && !alias.startsWith('=')) {
+      if (alias.includes("'") || /^[A-Z]{2,5}$/.test(alias)) answers.push(alias)
+      if (/^pl\.?\s+/i.test(alias))
+        answers.push(alias.replace(/^pl\.?\s+/i, ''))
     }
     const contraction = variant.match(/^(.*?)\s*\(=\s*(.*?)\)(.*)$/)
     if (contraction) {
@@ -97,15 +201,25 @@ export function acceptedAnswers(
     }
     if (direction === 'english' && variant.startsWith('to '))
       answers.push(variant.slice(3))
-    if (direction === 'german') {
-      const slash = variant.match(/[\p{L}]+(?:\/[\p{L}]+)+/u)
+  }
+  if (direction === 'english')
+    answers.push(
+      ...answers
+        .filter((answer) => answer.startsWith('to '))
+        .map((answer) => answer.slice(3)),
+    )
+  if (direction === 'german') {
+    for (const answer of [...answers]) {
+      const slash = answer.match(/[\p{L}]+(?:\/[\p{L}]+)+/u)
       if (slash) {
         const [base, ...alternatives] = slash[0].split('/')
         for (const alternative of [
           base,
-          ...alternatives.map((part) => (part === 'e' ? `${base}e` : part)),
+          ...alternatives.map((part) =>
+            ['e', 'r', 'in', 'n'].includes(part) ? `${base}${part}` : part,
+          ),
         ]) {
-          answers.push(variant.replace(slash[0], alternative))
+          answers.push(answer.replace(slash[0], alternative))
         }
       }
     }

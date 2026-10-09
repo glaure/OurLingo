@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   CloudOff,
   FileCheck2,
+  GraduationCap,
   Languages,
   Keyboard,
   ListChecks,
@@ -19,17 +20,29 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Users,
   X,
 } from 'lucide-react'
 import {
+  bundledUnitFiles,
   createAnswerChoices,
   createRound,
   isCorrectAnswer,
+  isVocabularyLibrary,
   isVocabularyUnit,
+  libraryStorageKey,
+  mergeBundledUnits,
   storageKey,
+  unitKey,
+  upsertUnit,
   validateEntries,
 } from './vocabulary'
-import type { AnswerChoice, Entry, VocabularyUnit } from './vocabulary'
+import type {
+  AnswerChoice,
+  Entry,
+  VocabularyLibrary,
+  VocabularyUnit,
+} from './vocabulary'
 import './OurLingo.css'
 
 type Direction = 'english' | 'german'
@@ -37,13 +50,22 @@ type PracticeMode = 'typed' | 'multiple-choice'
 type Result = { entry: Entry; answer: string; correct: boolean }
 
 export default function OurLingo() {
+  const [library, setLibrary] = useState<VocabularyLibrary | null>(null)
   const [unit, setUnit] = useState<VocabularyUnit | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [warning, setWarning] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const [view, setView] = useState<'review' | 'practice'>('review')
+  const [space, setSpace] = useState<'kid' | 'parent'>('kid')
+  const [view, setView] = useState<'library' | 'review' | 'practice'>('library')
+  const [bookFilter, setBookFilter] = useState<'all' | VocabularyUnit['book']>(
+    'all',
+  )
+  const [showCreator, setShowCreator] = useState(false)
+  const [newBook, setNewBook] = useState<VocabularyUnit['book']>('MORE! 1')
+  const [newNumber, setNewNumber] = useState('2')
+  const [newTitle, setNewTitle] = useState('')
   const [query, setQuery] = useState('')
   const [direction, setDirection] = useState<Direction>('english')
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('typed')
@@ -67,8 +89,64 @@ export default function OurLingo() {
 
   useEffect(() => {
     const controller = new AbortController()
+    async function installBundledUnits(
+      currentLibrary: VocabularyLibrary,
+    ): Promise<VocabularyLibrary> {
+      let updated = currentLibrary
+      const failed: string[] = []
+      for (const bundled of bundledUnitFiles) {
+        if (updated.bundledUnitKeys?.includes(unitKey(bundled))) continue
+        if (controller.signal.aborted) return updated
+        try {
+          const response = await fetch(
+            `${import.meta.env.BASE_URL}data/${bundled.file}`,
+            { signal: controller.signal },
+          )
+          if (!response.ok) throw new Error('Unit unavailable')
+          const data: unknown = await response.json()
+          if (
+            !isVocabularyUnit(data) ||
+            data.book !== bundled.book ||
+            data.unit !== bundled.unit ||
+            validateEntries(data.entries)
+          )
+            throw new Error('Invalid unit')
+          if (controller.signal.aborted) return updated
+          const merged = mergeBundledUnits(updated, [data])
+          localStorage.setItem(libraryStorageKey, JSON.stringify(merged))
+          updated = merged
+        } catch {
+          if (controller.signal.aborted) return updated
+          failed.push(`${bundled.book} Unit ${bundled.unit}`)
+        }
+      }
+      if (failed.length)
+        setWarning(
+          `${failed.join(', ')} could not be added. Your existing vocabulary remains available. Refresh to try again.`,
+        )
+      return updated
+    }
     async function load() {
       setLoadError('')
+      try {
+        const stored = localStorage.getItem(libraryStorageKey)
+        if (stored) {
+          const parsed: unknown = JSON.parse(stored)
+          if (!isVocabularyLibrary(parsed))
+            throw new Error('Invalid saved library')
+          const refreshed = await installBundledUnits(parsed)
+          if (controller.signal.aborted) return
+          setLibrary(refreshed)
+          setUnit(refreshed.units[0] || null)
+          setEntries(refreshed.units[0]?.entries || [])
+          return
+        }
+      } catch {
+        setWarning(
+          'The saved library could not be loaded. Recovering the original unit instead.',
+        )
+      }
+      let initialUnit: VocabularyUnit | null = null
       try {
         const stored = localStorage.getItem(storageKey)
         if (stored) {
@@ -80,9 +158,7 @@ export default function OurLingo() {
             validateEntries(parsed.entries)
           )
             throw new Error('Invalid saved unit')
-          setUnit(parsed)
-          setEntries(parsed.entries)
-          return
+          initialUnit = parsed
         }
       } catch {
         setWarning(
@@ -90,15 +166,36 @@ export default function OurLingo() {
         )
       }
       try {
-        const response = await fetch(
-          `${import.meta.env.BASE_URL}data/more-1-unit-1.json`,
-          { signal: controller.signal },
+        if (!initialUnit) {
+          const response = await fetch(
+            `${import.meta.env.BASE_URL}data/more-1-unit-1.json`,
+            { signal: controller.signal },
+          )
+          if (!response.ok) throw new Error('Unit unavailable')
+          const data: unknown = await response.json()
+          if (!isVocabularyUnit(data)) throw new Error('Invalid unit')
+          initialUnit = data
+        }
+        const initialLibrary = upsertUnit(
+          {
+            schemaVersion: 1,
+            units: [],
+            bundledUnitKeys: [unitKey(initialUnit)],
+          },
+          initialUnit,
         )
-        if (!response.ok) throw new Error('Unit unavailable')
-        const data: unknown = await response.json()
-        if (!isVocabularyUnit(data)) throw new Error('Invalid unit')
-        setUnit(data)
-        setEntries(data.entries)
+        const refreshed = await installBundledUnits(initialLibrary)
+        if (controller.signal.aborted) return
+        try {
+          localStorage.setItem(libraryStorageKey, JSON.stringify(refreshed))
+        } catch {
+          setWarning(
+            'This browser could not save the library. Vocabulary is available for this visit only.',
+          )
+        }
+        setLibrary(refreshed)
+        setUnit(initialUnit)
+        setEntries(initialUnit.entries)
       } catch {
         if (!controller.signal.aborted)
           setLoadError('The vocabulary could not be loaded. Please try again.')
@@ -125,6 +222,31 @@ export default function OurLingo() {
     }
   }, [view, current, feedback, practiceMode])
 
+  useLayoutEffect(() => {
+    if (view !== 'review') return
+    let active = true
+    function fitReviewFields() {
+      if (!active) return
+      const fields = Array.from(
+        document.querySelectorAll<HTMLTextAreaElement>('.entry-field textarea'),
+      )
+      fields.forEach((field) => {
+        field.style.height = 'auto'
+      })
+      const heights = fields.map((field) => field.scrollHeight + 2)
+      fields.forEach((field, index) => {
+        field.style.height = `${heights[index]}px`
+      })
+    }
+    fitReviewFields()
+    void document.fonts.ready.then(fitReviewFields)
+    window.addEventListener('resize', fitReviewFields)
+    return () => {
+      active = false
+      window.removeEventListener('resize', fitReviewFields)
+    }
+  }, [entries, view, query])
+
   function updateEntry(index: number, field: keyof Entry, value: string) {
     setEntries((previous) =>
       previous.map((entry, entryIndex) =>
@@ -132,6 +254,9 @@ export default function OurLingo() {
           ? {
               ...entry,
               [field]: field === 'example' && !value.trim() ? null : value,
+              ...(entry.origin === 'word-file' && field === 'german'
+                ? { translationSource: 'parent' as const }
+                : {}),
             }
           : entry,
       ),
@@ -140,13 +265,14 @@ export default function OurLingo() {
   }
 
   function save() {
-    if (!unit) return
+    if (!unit || !library || space !== 'parent') return
     const error = validateEntries(entries)
     if (error) {
       setWarning(error)
       return
     }
     const cleaned = entries.map((entry) => ({
+      ...entry,
       english: entry.english.trim(),
       german: entry.german.trim(),
       example: entry.example?.trim() || null,
@@ -157,7 +283,9 @@ export default function OurLingo() {
       reviewStatus: 'approved',
     }
     try {
-      localStorage.setItem(storageKey, JSON.stringify(saved))
+      const savedLibrary = upsertUnit(library, saved)
+      localStorage.setItem(libraryStorageKey, JSON.stringify(savedLibrary))
+      setLibrary(savedLibrary)
       setUnit(saved)
       setEntries(cleaned)
       setWarning('')
@@ -181,25 +309,142 @@ export default function OurLingo() {
     )
     const link = document.createElement('a')
     link.href = url
-    link.download = 'ourlingo-more-1-unit-1.json'
+    link.download = `ourlingo-more-${unit.book === 'MORE! 1' ? 1 : 2}-unit-${unit.unit}.json`
     link.click()
     URL.revokeObjectURL(url)
   }
 
-  function goTo(next: 'review' | 'practice') {
-    if (next === 'practice' && !approved) return
+  function mayLeave(): boolean {
+    if (dirty && !window.confirm('Discard the unsaved vocabulary changes?'))
+      return false
     if (
-      next === 'review' &&
       round.length &&
       !complete &&
       !window.confirm(
         'Leave this practice round? Your vocabulary will stay saved.',
       )
     )
+      return false
+    return true
+  }
+
+  function switchSpace() {
+    if (!mayLeave()) return
+    setSpace(space === 'kid' ? 'parent' : 'kid')
+    setView('library')
+    setEntries(unit?.entries || [])
+    setShowCreator(false)
+    setQuery('')
+    setMessage('')
+    setWarning('')
+    resetRound()
+  }
+
+  function selectUnit(selected: VocabularyUnit) {
+    if (space === 'kid' && selected.reviewStatus !== 'approved') return
+    if (!mayLeave()) return
+    setUnit(selected)
+    setEntries(selected.entries)
+    setView(space === 'kid' ? 'practice' : 'review')
+    setQuery('')
+    setMessage('')
+    setWarning('')
+    setShowCreator(false)
+    resetRound()
+  }
+
+  function nextNumber(book: VocabularyUnit['book']): string {
+    return String(
+      Math.max(
+        0,
+        ...(library?.units
+          .filter((item) => item.book === book)
+          .map((item) => item.unit) || []),
+      ) + 1,
+    )
+  }
+
+  function beginUnit() {
+    const book = bookFilter === 'all' ? unit?.book || 'MORE! 1' : bookFilter
+    setNewBook(book)
+    setNewNumber(nextNumber(book))
+    setNewTitle('')
+    setShowCreator(true)
+    setWarning('')
+  }
+
+  function addUnit() {
+    if (!library || space !== 'parent') return
+    const number = Number(newNumber)
+    if (!Number.isSafeInteger(number) || number < 1) {
+      setWarning('Enter a positive whole unit number.')
       return
+    }
+    const created: VocabularyUnit = {
+      schemaVersion: 1,
+      book: newBook,
+      unit: number,
+      title: newTitle.trim() || `Unit ${number}`,
+      source: 'Manually entered vocabulary',
+      reviewStatus: 'pending',
+      entries: [],
+    }
+    if (library.units.some((item) => unitKey(item) === unitKey(created))) {
+      setWarning(
+        `${newBook} Unit ${number} already exists. Open it to add vocabulary.`,
+      )
+      return
+    }
+    const next = upsertUnit(library, created)
+    try {
+      localStorage.setItem(libraryStorageKey, JSON.stringify(next))
+      setLibrary(next)
+      selectUnit(created)
+    } catch {
+      setWarning(
+        'This browser could not save the new unit. No existing vocabulary was changed.',
+      )
+    }
+  }
+
+  function deleteUnit(selected: VocabularyUnit) {
+    if (!library || space !== 'parent') return
+    if (
+      !window.confirm(
+        `Delete ${selected.book} Unit ${selected.unit} and all of its vocabulary?`,
+      )
+    )
+      return
+    const next: VocabularyLibrary = {
+      ...library,
+      units: library.units.filter(
+        (item) => unitKey(item) !== unitKey(selected),
+      ),
+    }
+    try {
+      localStorage.setItem(libraryStorageKey, JSON.stringify(next))
+      setLibrary(next)
+      if (unit && unitKey(unit) === unitKey(selected)) {
+        setUnit(next.units[0] || null)
+        setEntries(next.units[0]?.entries || [])
+      }
+      setWarning('')
+    } catch {
+      setWarning(
+        'This browser could not save the deletion. The unit has been kept.',
+      )
+    }
+  }
+
+  function goTo(next: 'library' | 'review' | 'practice') {
+    if (next === 'practice' && !approved) return
+    if (next === 'review' && space !== 'parent') return
+    if (next === view || !mayLeave()) return
     setView(next)
     setMessage('')
-    if (next === 'review') resetRound()
+    setEntries(unit?.entries || [])
+    setShowCreator(false)
+    resetRound()
   }
 
   function resetRound() {
@@ -278,22 +523,34 @@ export default function OurLingo() {
         </a>
         <div className="library-label">YOUR LIBRARY</div>
         <div className="unit-label">
-          <div className="book-spine">1</div>
+          <div className="book-spine">{unit?.book === 'MORE! 2' ? 2 : 1}</div>
           <div>
-            <strong>MORE! 1</strong>
-            <span>Unit 1</span>
+            <strong>{unit?.book || 'OurLingo'}</strong>
+            <span>{unit ? `Unit ${unit.unit}` : 'Your units'}</span>
           </div>
           <span className="unit-dot" />
         </div>
         <nav aria-label="Unit navigation">
           <button
-            className={view === 'review' ? 'nav-link active' : 'nav-link'}
-            onClick={() => goTo('review')}
+            className={view === 'library' ? 'nav-link active' : 'nav-link'}
+            onClick={() => goTo('library')}
           >
-            <ClipboardCheck size={19} />
-            Review vocabulary
-            <span className="nav-count">{entries.length || '-'}</span>
+            <BookOpen size={19} />
+            My units
+            <span className="nav-count">{library?.units.length || 0}</span>
           </button>
+          {space === 'parent' && unit && (
+            <>
+              <button
+                className={view === 'review' ? 'nav-link active' : 'nav-link'}
+                onClick={() => goTo('review')}
+              >
+                <ClipboardCheck size={19} />
+                Review vocabulary
+                <span className="nav-count">{entries.length || '-'}</span>
+              </button>
+            </>
+          )}
           <button
             className={view === 'practice' ? 'nav-link active' : 'nav-link'}
             disabled={!approved}
@@ -330,24 +587,37 @@ export default function OurLingo() {
         <header className="topbar">
           <div className="breadcrumb">
             <BookOpen size={17} />
-            <span>MORE! 1</span>
+            <span>{view === 'library' ? 'OurLingo' : unit?.book}</span>
             <ChevronRight size={14} />
-            <strong>Unit 1</strong>
+            <strong>
+              {view === 'library' ? 'My units' : `Unit ${unit?.unit}`}
+            </strong>
           </div>
           <div className="topbar-actions">
+            {space === 'parent' && unit && view !== 'library' && (
+              <>
+                <button
+                  className="icon-button"
+                  title="Download vocabulary backup"
+                  aria-label="Download vocabulary backup"
+                  onClick={download}
+                  disabled={!unit}
+                >
+                  <ArrowDownToLine size={19} />
+                </button>
+              </>
+            )}
             <button
-              className="icon-button"
-              title="Download vocabulary backup"
-              aria-label="Download vocabulary backup"
-              onClick={download}
-              disabled={!unit}
+              className="button secondary space-switch"
+              onClick={switchSpace}
             >
-              <ArrowDownToLine size={19} />
+              {space === 'kid' ? (
+                <Users size={17} />
+              ) : (
+                <GraduationCap size={17} />
+              )}
+              {space === 'kid' ? 'Parent space' : 'Kid space'}
             </button>
-            <div className="parent-avatar" aria-label="Parent review space">
-              P
-            </div>
-            <span className="parent-text">Parent space</span>
           </div>
         </header>
         <main>
@@ -355,22 +625,32 @@ export default function OurLingo() {
             <div>
               <div className="eyebrow">MORE WORDS AND PHRASES</div>
               <h1>
-                {view === 'review' ? 'Unit 1 vocabulary' : 'A little practice'}
+                {view === 'library'
+                  ? space === 'kid'
+                    ? "Let's learn"
+                    : 'Your unit library'
+                  : view === 'review'
+                    ? `Unit ${unit?.unit} vocabulary`
+                    : 'A little practice'}
               </h1>
               <p>
-                {view === 'review'
-                  ? 'MORE! 1 · English / Deutsch'
-                  : 'MORE! 1 · Unit 1'}
+                {view === 'library'
+                  ? 'MORE! 1 + MORE! 2 · English / Deutsch'
+                  : `${unit?.book} · Unit ${unit?.unit}`}
               </p>
             </div>
-            <span className={`status-badge ${approved ? 'approved' : ''}`}>
-              <span />
-              {dirty
-                ? 'Unsaved changes'
-                : approved
-                  ? 'Reviewed'
-                  : 'Awaiting review'}
-            </span>
+            {view !== 'library' && (
+              <>
+                <span className={`status-badge ${approved ? 'approved' : ''}`}>
+                  <span />
+                  {dirty
+                    ? 'Unsaved changes'
+                    : approved
+                      ? 'Reviewed'
+                      : 'Awaiting review'}
+                </span>
+              </>
+            )}
           </div>
           {warning && (
             <div className="notice warning" role="alert">
@@ -390,7 +670,7 @@ export default function OurLingo() {
               <span>{message}</span>
             </div>
           )}
-          {!unit && !loadError && (
+          {!library && !loadError && (
             <div className="empty-state">
               <LoaderCircle className="spin" size={28} />
               <h2>Opening your vocabulary...</h2>
@@ -409,7 +689,180 @@ export default function OurLingo() {
               </button>
             </div>
           )}
-          {unit && view === 'review' && (
+          {library && view === 'library' && (
+            <section
+              className="library-section"
+              aria-label={space === 'kid' ? 'Kid space' : 'Parent unit library'}
+            >
+              <div className="library-toolbar">
+                <fieldset className="book-filter">
+                  <legend className="visually-hidden">Filter by book</legend>
+                  <div className="segmented">
+                    {(['all', 'MORE! 1', 'MORE! 2'] as const).map((book) => (
+                      <label
+                        key={book}
+                        className={bookFilter === book ? 'selected' : ''}
+                      >
+                        <input
+                          type="radio"
+                          name="book-filter"
+                          value={book}
+                          checked={bookFilter === book}
+                          onChange={() => setBookFilter(book)}
+                        />
+                        {book === 'all' ? 'All books' : book}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {space === 'parent' && (
+                  <button className="button primary" onClick={beginUnit}>
+                    <Plus size={18} />
+                    Add unit
+                  </button>
+                )}
+              </div>
+              {space === 'parent' && showCreator && (
+                <form
+                  className="unit-creator"
+                  aria-label="New unit"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    addUnit()
+                  }}
+                >
+                  <div className="creator-heading">
+                    <h2>New unit</h2>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Cancel new unit"
+                      onClick={() => {
+                        setShowCreator(false)
+                        setWarning('')
+                      }}
+                    >
+                      <X size={19} />
+                    </button>
+                  </div>
+                  <div className="creator-fields">
+                    <label>
+                      Book
+                      <select
+                        value={newBook}
+                        onChange={(event) => {
+                          const book = event.target
+                            .value as VocabularyUnit['book']
+                          setNewBook(book)
+                          setNewNumber(nextNumber(book))
+                        }}
+                      >
+                        <option>MORE! 1</option>
+                        <option>MORE! 2</option>
+                      </select>
+                    </label>
+                    <label>
+                      Unit number
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        required
+                        value={newNumber}
+                        onChange={(event) => setNewNumber(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Title (optional)
+                      <input
+                        value={newTitle}
+                        placeholder="At school"
+                        maxLength={120}
+                        onChange={(event) => setNewTitle(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button type="submit" className="button primary">
+                    <Plus size={17} />
+                    Create unit
+                  </button>
+                </form>
+              )}
+              <div className="unit-grid">
+                {library.units
+                  .filter(
+                    (item) => bookFilter === 'all' || item.book === bookFilter,
+                  )
+                  .map((item) => (
+                    <article
+                      className={`unit-card ${item.book === 'MORE! 2' ? 'second-book' : ''}`}
+                      key={unitKey(item)}
+                    >
+                      <div className="unit-card-top">
+                        <span className="unit-book-label">{item.book}</span>
+                        {space === 'parent' && (
+                          <button
+                            className="icon-button delete-button"
+                            aria-label={`Delete ${item.book} Unit ${item.unit}`}
+                            title={`Delete ${item.book} Unit ${item.unit}`}
+                            onClick={() => deleteUnit(item)}
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="unit-card-heading">
+                        <span className="unit-number">{item.unit}</span>
+                        <div>
+                          <h2>Unit {item.unit}</h2>
+                          <p>
+                            {item.title === `Unit ${item.unit}`
+                              ? item.book
+                              : item.title}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="unit-card-details">
+                        <span>{item.entries.length} words & phrases</span>
+                        <span
+                          className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
+                        >
+                          <span />
+                          {item.reviewStatus === 'approved'
+                            ? 'Ready'
+                            : 'Awaiting review'}
+                        </span>
+                      </div>
+                      <button
+                        className={`button ${space === 'kid' ? 'primary' : 'secondary'} unit-action`}
+                        disabled={
+                          space === 'kid' && item.reviewStatus !== 'approved'
+                        }
+                        aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} Unit ${item.unit}`}
+                        onClick={() => selectUnit(item)}
+                      >
+                        {space === 'kid' ? (
+                          <Sparkles size={17} />
+                        ) : (
+                          <ClipboardCheck size={17} />
+                        )}
+                        {space === 'kid' ? 'Practise' : 'Review vocabulary'}
+                        <ArrowRight size={17} />
+                      </button>
+                    </article>
+                  ))}
+              </div>
+              {!library.units.some(
+                (item) => bookFilter === 'all' || item.book === bookFilter,
+              ) && (
+                <div className="empty-state">
+                  <BookOpen size={30} />
+                  <h2>No units here yet.</h2>
+                </div>
+              )}
+            </section>
+          )}
+          {unit && space === 'parent' && view === 'review' && (
             <>
               <section className="unit-summary" aria-label="Unit summary">
                 <div className="summary-item">
@@ -441,7 +894,9 @@ export default function OurLingo() {
                     <span>
                       {approved
                         ? 'For your next practice'
-                        : 'From your workbook photo'}
+                        : unit.source.includes('photo')
+                          ? 'From your workbook photo'
+                          : 'Your added vocabulary'}
                     </span>
                   </div>
                 </div>
@@ -503,6 +958,9 @@ export default function OurLingo() {
                             updateEntry(index, 'english', event.target.value)
                           }
                         />
+                        {entry.origin === 'word-file' && (
+                          <span className="entry-origin">Word file</span>
+                        )}
                       </label>
                       <label className="entry-field german-field">
                         <span className="mobile-label">Deutsch</span>
@@ -514,6 +972,13 @@ export default function OurLingo() {
                             updateEntry(index, 'german', event.target.value)
                           }
                         />
+                        {entry.origin === 'word-file' && (
+                          <span className="entry-origin">
+                            {entry.translationSource === 'parent'
+                              ? 'Parent translation'
+                              : 'Suggested translation'}
+                          </span>
+                        )}
                       </label>
                       <label className="entry-field example-field">
                         <span className="mobile-label">Example</span>
@@ -591,7 +1056,9 @@ export default function OurLingo() {
                     <Plus size={18} />
                     Add a word or phrase
                   </button>
-                  <span>MORE! 1 · Unit 1</span>
+                  <span>
+                    {unit.book} · Unit {unit.unit}
+                  </span>
                 </div>
               </section>
               <div className="review-bottom">
@@ -601,7 +1068,7 @@ export default function OurLingo() {
                     ? 'Changes not saved yet'
                     : approved
                       ? 'Approved vocabulary saved locally'
-                      : 'Photo transcription · Awaiting your review'}
+                      : 'Awaiting your review'}
                 </span>
                 <button
                   className="button primary"
@@ -623,7 +1090,10 @@ export default function OurLingo() {
                   </span>
                   <div className="eyebrow">YOUR NEXT SMALL WIN</div>
                   <h2>Ready when you are.</h2>
-                  <p>Unit 1 · {entries.length} words & phrases</p>
+                  <p>
+                    {unit.book} · Unit {unit.unit} · {entries.length} words &
+                    phrases
+                  </p>
                   <fieldset className="direction-field mode-field">
                     <legend>Practice mode</legend>
                     <div className="segmented">

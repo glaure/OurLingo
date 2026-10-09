@@ -1,3 +1,210 @@
+.entry-origin {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8a6c36;
+  margin: 4px 6px 0;
+  overflow-wrap: anywhere;
+}
+.library-section {
+  min-height: 590px;
+  padding-bottom: 42px;
+}
+.library-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.book-filter {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.book-filter .segmented {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.book-filter .segmented label {
+  min-height: 42px;
+  font-size: 14px;
+  text-align: center;
+  padding: 11px 17px;
+  white-space: nowrap;
+}
+.unit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  gap: 20px;
+}
+.unit-card {
+  border: 1px solid var(--line);
+  border-top: 3px solid #83ae8a;
+  border-radius: 7px;
+  background: #fff;
+  padding: 22px;
+  min-width: 0;
+}
+.unit-card.second-book {
+  border-top-color: #dca48b;
+}
+.unit-card-top,
+.unit-card-heading,
+.unit-card-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.unit-card-top {
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: 21px;
+}
+.unit-book-label {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--green);
+}
+.second-book .unit-book-label {
+  color: #a96f54;
+}
+.unit-card-heading {
+  margin-bottom: 26px;
+  align-items: flex-start;
+}
+.unit-number {
+  display: grid;
+  place-items: center;
+  min-width: 52px;
+  height: 64px;
+  border-radius: 4px;
+  border-left: 4px solid #9bb679;
+  background: #eaf3e2;
+  color: #527348;
+  font: 600 30px var(--heading);
+}
+.second-book .unit-number {
+  border-left-color: #dca48b;
+  background: #faece5;
+  color: #a96f54;
+}
+.unit-card h2 {
+  font: 500 25px var(--heading);
+  margin-bottom: 8px;
+}
+.unit-card-heading > div {
+  min-width: 0;
+}
+.unit-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.unit-card-details {
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.unit-card .status-badge {
+  padding: 5px 8px;
+}
+.unit-action {
+  width: 100%;
+  min-height: 46px;
+}
+.unit-action svg:last-child {
+  margin-left: auto;
+}
+.unit-creator {
+  border-block: 1px solid var(--line);
+  padding: 22px 0;
+  margin-bottom: 30px;
+}
+.creator-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.creator-heading h2 {
+  font-size: 20px;
+}
+.creator-fields {
+  display: grid;
+  grid-template-columns: 150px 120px minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.creator-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 14px;
+  min-width: 0;
+}
+.creator-fields input,
+.creator-fields select {
+  width: 100%;
+  border: 1px solid #d9e4dc;
+  background: #fff;
+  padding: 11px;
+  font-size: 16px;
+  border-radius: 5px;
+}
+.space-switch {
+  white-space: nowrap;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 850px) {
+  .sidebar nav {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .library-toolbar {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .book-filter {
+    width: 100%;
+  }
+  .book-filter .segmented label {
+    padding-inline: 8px;
+  }
+  .creator-fields {
+    grid-template-columns: 1fr;
+  }
+  .unit-card {
+    padding: 20px;
+  }
+  .space-switch {
+    font-size: 12px;
+    padding: 9px;
+    gap: 6px;
+  }
+  .topbar-actions {
+    gap: 5px;
+  }
+  .breadcrumb {
+    gap: 5px;
+  }
+}
 .mode-field .segmented label {
   display: flex;
   align-items: center;
@@ -1244,7 +1451,7 @@ progress::-moz-progress-bar {
     padding: 7px 4px;
     border-color: #edf1ee;
   }
-  .delete-button {
+  .vocabulary-row .delete-button {
     position: absolute;
     right: 6px;
     bottom: 24px;
