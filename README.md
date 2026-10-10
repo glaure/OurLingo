@@ -142,10 +142,16 @@ Keep using `npm run dev` for the browser version. This checkout now includes the
 npx tauri android build --debug --apk --target aarch64
 ```
 
-The first build may download Gradle and any Android SDK Platform required by the generated project. The APK is written to `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`. To install it on a connected Android device with USB debugging enabled, run:
+The first build may download Gradle and any Android SDK Platform required by the generated project. Tauri writes the APK to `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`. For a friendlier filename to share, copy it to Downloads:
 
 ```powershell
-& "$env:ANDROID_HOME\platform-tools\adb.exe" install -r src-tauri\gen\android\app\build\outputs\apk\universal\debug\app-universal-debug.apk
+Copy-Item -Force src-tauri\gen\android\app\build\outputs\apk\universal\debug\app-universal-debug.apk "$env:USERPROFILE\Downloads\OurLingo-debug.apk"
+```
+
+To install it on a connected Android device with USB debugging enabled, run:
+
+```powershell
+& "$env:ANDROID_HOME\platform-tools\adb.exe" install -r "$env:USERPROFILE\Downloads\OurLingo-debug.apk"
 ```
 
 Use `adb devices -l` to confirm a device is connected. Test the packaged app with Wi-Fi and mobile data disabled to verify bundled units load offline. The Android WebView has separate localStorage from the browser, and there is no library import/restore yet; use test data in the native app until a full-library backup and restore path exists. Windows desktop packaging can follow later; this machine already has the documented C++ Build Tools and WebView2 prerequisites. See the [official Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) if a toolchain update is needed.
