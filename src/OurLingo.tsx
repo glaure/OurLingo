@@ -13,6 +13,7 @@ import {
   GraduationCap,
   Languages,
   Keyboard,
+  Link2,
   ListChecks,
   LoaderCircle,
   Plus,
@@ -26,6 +27,7 @@ import {
 import {
   bundledUnitFiles,
   createAnswerChoices,
+  createMatchingRound,
   createRound,
   isCorrectAnswer,
   isVocabularyLibrary,
@@ -46,7 +48,7 @@ import type {
 import './OurLingo.css'
 
 type Direction = 'english' | 'german'
-type PracticeMode = 'typed' | 'multiple-choice'
+type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
 
 export default function OurLingo() {
@@ -75,8 +77,24 @@ export default function OurLingo() {
   const [results, setResults] = useState<Result[]>([])
   const [answer, setAnswer] = useState('')
   const [feedback, setFeedback] = useState<Result | null>(null)
+  const [matchingEnglish, setMatchingEnglish] = useState<number[]>([])
+  const [matchingGerman, setMatchingGerman] = useState<number[]>([])
+  const [matchingSelection, setMatchingSelection] = useState<{
+    side: Direction
+    index: number
+  } | null>(null)
+  const [matchedPairs, setMatchedPairs] = useState<number[]>([])
+  const [matchingMistakes, setMatchingMistakes] = useState<number[]>([])
+  const [matchingFeedback, setMatchingFeedback] = useState<
+    'idle' | 'correct' | 'incorrect'
+  >('idle')
+  const [matchingError, setMatchingError] = useState<{
+    english: number
+    german: number
+  } | null>(null)
   const answerInput = useRef<HTMLInputElement>(null)
   const choiceInput = useRef<HTMLInputElement>(null)
+  const matchingInput = useRef<HTMLButtonElement>(null)
   const dirty =
     !!unit && JSON.stringify(unit.entries) !== JSON.stringify(entries)
   const approved = unit?.reviewStatus === 'approved' && !dirty
@@ -218,6 +236,8 @@ export default function OurLingo() {
   useEffect(() => {
     if (view === 'practice' && current && !feedback) {
       if (practiceMode === 'typed') answerInput.current?.focus()
+      else if (practiceMode === 'matching')
+        matchingInput.current?.focus({ preventScroll: true })
       else choiceInput.current?.focus()
     }
   }, [view, current, feedback, practiceMode])
@@ -453,8 +473,43 @@ export default function OurLingo() {
     setResults([])
     setAnswer('')
     setFeedback(null)
+    setMatchingEnglish([])
+    setMatchingGerman([])
+    setMatchingSelection(null)
+    setMatchedPairs([])
+    setMatchingMistakes([])
+    setMatchingFeedback('idle')
+    setMatchingError(null)
   }
   function startRound(words = entries) {
+    if (practiceMode === 'matching') {
+      const nextRound = createMatchingRound(
+        entries,
+        5,
+        words === entries ? [] : words,
+      )
+      if (!nextRound.length) {
+        setWarning(
+          'Matching pairs needs at least two distinct translations. You can still use typed answers.',
+        )
+        return
+      }
+      const english = createRound(nextRound, nextRound.length).map((entry) =>
+        nextRound.indexOf(entry),
+      )
+      const german = createRound(nextRound, nextRound.length).map((entry) =>
+        nextRound.indexOf(entry),
+      )
+      if (english.every((index, position) => index === german[position]))
+        german.push(german.shift()!)
+      resetRound()
+      setRound(nextRound)
+      setMatchingEnglish(english)
+      setMatchingGerman(german)
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      setWarning('')
+      return
+    }
     const options = new Map(
       words.map((entry) => [
         entry,
@@ -499,6 +554,42 @@ export default function OurLingo() {
     setAnswer('')
   }
 
+  function selectMatchingWord(side: Direction, index: number) {
+    if (matchedPairs.includes(index)) return
+    setMatchingFeedback('idle')
+    setMatchingError(null)
+    if (!matchingSelection || matchingSelection.side === side) {
+      setMatchingSelection(
+        matchingSelection?.index === index ? null : { side, index },
+      )
+      return
+    }
+    const english = side === 'english' ? index : matchingSelection.index
+    const german = side === 'german' ? index : matchingSelection.index
+    setMatchingSelection(null)
+    if (english === german) {
+      setMatchedPairs((previous) => [...previous, english])
+      setMatchingFeedback('correct')
+    } else {
+      setMatchingMistakes((previous) =>
+        previous.includes(english) ? previous : [...previous, english],
+      )
+      setMatchingError({ english, german })
+      setMatchingFeedback('incorrect')
+    }
+  }
+
+  function finishMatchingRound() {
+    if (matchedPairs.length !== round.length) return
+    setResults(
+      round.map((entry, index) => ({
+        entry,
+        answer: entry.german,
+        correct: !matchingMistakes.includes(index),
+      })),
+    )
+  }
+
   const visibleEntries = entries
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) =>
@@ -508,7 +599,9 @@ export default function OurLingo() {
     )
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${practiceMode === 'matching' && round.length > 0 && !complete ? 'matching-active' : ''}`}
+    >
       <aside className="sidebar">
         <a
           className="brand"
@@ -1125,52 +1218,73 @@ export default function OurLingo() {
                         <ListChecks size={17} />
                         Multiple choice
                       </label>
-                    </div>
-                  </fieldset>
-                  <fieldset className="direction-field">
-                    <legend>Answer in</legend>
-                    <div className="segmented">
                       <label
-                        className={direction === 'english' ? 'selected' : ''}
+                        className={
+                          practiceMode === 'matching' ? 'selected' : ''
+                        }
                       >
                         <input
                           type="radio"
-                          name="direction"
-                          value="english"
-                          checked={direction === 'english'}
-                          onChange={() => setDirection('english')}
+                          name="practice-mode"
+                          value="matching"
+                          checked={practiceMode === 'matching'}
+                          onChange={() => setPracticeMode('matching')}
                         />
-                        English
-                      </label>
-                      <label
-                        className={direction === 'german' ? 'selected' : ''}
-                      >
-                        <input
-                          type="radio"
-                          name="direction"
-                          value="german"
-                          checked={direction === 'german'}
-                          onChange={() => setDirection('german')}
-                        />
-                        Deutsch
+                        <Link2 size={17} />
+                        Matching pairs
                       </label>
                     </div>
                   </fieldset>
-                  <label className="round-size">
-                    Words per round
-                    <select
-                      value={roundSize}
-                      onChange={(event) =>
-                        setRoundSize(Number(event.target.value))
-                      }
-                    >
-                      <option value={5}>5 words</option>
-                      <option value={10}>10 words</option>
-                      <option value={entries.length}>
-                        All {entries.length} words
-                      </option>
-                    </select>
-                  </label>
+                  {practiceMode !== 'matching' && (
+                    <>
+                      <fieldset className="direction-field">
+                        <legend>Answer in</legend>
+                        <div className="segmented">
+                          <label
+                            className={
+                              direction === 'english' ? 'selected' : ''
+                            }
+                          >
+                            <input
+                              type="radio"
+                              name="direction"
+                              value="english"
+                              checked={direction === 'english'}
+                              onChange={() => setDirection('english')}
+                            />
+                            English
+                          </label>
+                          <label
+                            className={direction === 'german' ? 'selected' : ''}
+                          >
+                            <input
+                              type="radio"
+                              name="direction"
+                              value="german"
+                              checked={direction === 'german'}
+                              onChange={() => setDirection('german')}
+                            />
+                            Deutsch
+                          </label>
+                        </div>
+                      </fieldset>
+                      <label className="round-size">
+                        Words per round
+                        <select
+                          value={roundSize}
+                          onChange={(event) =>
+                            setRoundSize(Number(event.target.value))
+                          }
+                        >
+                          <option value={5}>5 words</option>
+                          <option value={10}>10 words</option>
+                          <option value={entries.length}>
+                            All {entries.length} words
+                          </option>
+                        </select>
+                      </label>
+                    </>
+                  )}
                   <button
                     className="button primary start-button"
                     onClick={() => startRound()}
@@ -1180,7 +1294,108 @@ export default function OurLingo() {
                   </button>
                 </div>
               )}
-              {current && (
+              {round.length > 0 && practiceMode === 'matching' && !complete && (
+                <div className="matching-container">
+                  <div className="round-top">
+                    <span>Matching pairs</span>
+                    <span>
+                      {matchedPairs.length} of {round.length} matched
+                    </span>
+                  </div>
+                  <progress
+                    max={round.length}
+                    value={matchedPairs.length}
+                    aria-label="Matching progress"
+                  />
+                  <div className="matching-board">
+                    {(['english', 'german'] as const).map((side) => (
+                      <section
+                        className="matching-column"
+                        role="group"
+                        aria-label={
+                          side === 'english'
+                            ? 'English matching words'
+                            : 'German matching words'
+                        }
+                        key={side}
+                      >
+                        <h2>{side === 'english' ? 'English' : 'Deutsch'}</h2>
+                        <div className="matching-tiles">
+                          {(side === 'english'
+                            ? matchingEnglish
+                            : matchingGerman
+                          ).map((index) => {
+                            const matched = matchedPairs.includes(index)
+                            const selected =
+                              matchingSelection?.side === side &&
+                              matchingSelection.index === index
+                            const incorrect = matchingError?.[side] === index
+                            return (
+                              <button
+                                ref={
+                                  side === 'english' &&
+                                  index === matchingEnglish[0]
+                                    ? matchingInput
+                                    : undefined
+                                }
+                                key={index}
+                                type="button"
+                                className={`matching-tile ${matched ? 'matched' : ''} ${selected ? 'selected' : ''} ${incorrect ? 'incorrect' : ''}`}
+                                disabled={matched}
+                                aria-pressed={selected}
+                                aria-label={`${side === 'english' ? 'English' : 'Deutsch'}: ${round[index][side]}${matched ? ' (matched)' : ''}`}
+                                lang={side === 'english' ? 'en' : 'de'}
+                                onClick={() => selectMatchingWord(side, index)}
+                              >
+                                <span>{round[index][side]}</span>
+                                <span
+                                  className="matching-symbol"
+                                  aria-hidden="true"
+                                >
+                                  {matched && <CheckCircle2 size={18} />}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                  <div
+                    className={`matching-feedback ${matchingFeedback}`}
+                    role="status"
+                  >
+                    {matchedPairs.length === round.length
+                      ? 'All pairs matched!'
+                      : matchingFeedback === 'correct'
+                        ? "That's a pair!"
+                        : matchingFeedback === 'incorrect'
+                          ? 'Not a match. Try again.'
+                          : ''}
+                  </div>
+                  <button
+                    className="button primary answer-button"
+                    disabled={matchedPairs.length !== round.length}
+                    onClick={finishMatchingRound}
+                  >
+                    See results
+                    <ArrowRight size={17} />
+                  </button>
+                  <button
+                    className="button text-button"
+                    onClick={() => {
+                      if (
+                        window.confirm('End this round and choose a new one?')
+                      )
+                        resetRound()
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    Back to practice
+                  </button>
+                </div>
+              )}
+              {current && practiceMode !== 'matching' && (
                 <div className="round-container">
                   <div className="round-top">
                     <span>
@@ -1345,7 +1560,11 @@ export default function OurLingo() {
                     {results.length - missed.length}
                     <span> / {round.length}</span>
                   </div>
-                  <p>correct answers</p>
+                  <p>
+                    {practiceMode === 'matching'
+                      ? 'first-try matches'
+                      : 'correct answers'}
+                  </p>
                   {missed.length > 0 ? (
                     <div className="missed-words">
                       <h3>Words to revisit</h3>

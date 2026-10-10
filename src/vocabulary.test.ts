@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import {
   acceptedAnswers,
   createAnswerChoices,
+  createMatchingRound,
   createRound,
   isCorrectAnswer,
   isVocabularyLibrary,
@@ -304,6 +305,53 @@ test('multiple choice uses fewer options in small units and rejects single-answe
     createAnswerChoices(entries[0], [entries[0], { ...entries[0] }], 'german'),
     [],
   )
+})
+
+test('matching boards select five distinct pairs without overlapping answers in either language', () => {
+  for (const entries of [
+    unit.entries,
+    unitTwo.entries,
+    ...moreTwoUnits.map((item) => item.entries),
+  ]) {
+    const original = [...entries]
+    const board = createMatchingRound(entries)
+    assert.equal(board.length, 5)
+    assert.deepEqual(entries, original)
+    for (let first = 0; first < board.length; first++) {
+      for (let second = first + 1; second < board.length; second++) {
+        for (const direction of ['english', 'german'] as const) {
+          assert.equal(
+            acceptedAnswers(board[first], direction).some((answer) =>
+              acceptedAnswers(board[second], direction).includes(answer),
+            ),
+            false,
+          )
+        }
+      }
+    }
+  }
+})
+
+test('matching filters duplicate translations, supports small units and prioritises retries', () => {
+  const pairs = [
+    { english: 'she', german: 'sie', example: null },
+    { english: 'they', german: 'sie', example: null },
+    { english: 'happy', german: 'froh; glücklich', example: null },
+    { english: 'glad', german: 'froh', example: null },
+    { english: 'book', german: 'Buch', example: null },
+  ]
+  const board = createMatchingRound(pairs)
+  assert.equal(board.length, 3)
+  assert.ok(board.includes(pairs[4]))
+  assert.deepEqual(createMatchingRound(pairs.slice(0, 2)), [])
+  assert.equal(createMatchingRound([pairs[0], pairs[4]]).length, 2)
+  const retry = createMatchingRound(unit.entries, 5, [
+    unit.entries[0],
+    unit.entries[1],
+  ])
+  assert.equal(retry.length, 5)
+  assert.ok(retry.includes(unit.entries[0]))
+  assert.ok(retry.includes(unit.entries[1]))
 })
 
 test('libraries keep books and units distinct and update only the selected unit', () => {

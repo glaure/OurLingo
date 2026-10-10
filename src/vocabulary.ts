@@ -280,6 +280,35 @@ export function createAnswerChoices(
   }))
 }
 
+export function createMatchingRound(
+  entries: Entry[],
+  limit = 5,
+  priority: Entry[] = [],
+): Entry[] {
+  const selected: Entry[] = []
+  const ordered = [
+    ...priority.filter((entry) => entries.includes(entry)),
+    ...createRound(entries, entries.length),
+  ]
+  for (const entry of ordered) {
+    const english = new Set(acceptedAnswers(entry, 'english'))
+    const german = new Set(acceptedAnswers(entry, 'german'))
+    if (
+      selected.some(
+        (other) =>
+          acceptedAnswers(other, 'english').some((answer) =>
+            english.has(answer),
+          ) ||
+          acceptedAnswers(other, 'german').some((answer) => german.has(answer)),
+      )
+    )
+      continue
+    selected.push(entry)
+    if (selected.length >= limit) break
+  }
+  return selected.length >= 2 && limit >= 2 ? selected : []
+}
+
 export function createRound(entries: Entry[], limit = 10): Entry[] {
   const shuffled = [...entries]
   for (let index = shuffled.length - 1; index > 0; index--) {

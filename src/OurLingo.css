@@ -1,3 +1,123 @@
+.matching-active .breadcrumb {
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .matching-active .page-heading .eyebrow,
+  .matching-active .page-heading > .status-badge {
+    display: none;
+  }
+  .matching-active .page-heading {
+    margin-bottom: 20px;
+  }
+  .matching-active .practice-section {
+    padding-top: 0;
+  }
+  .matching-active .topbar-actions > .icon-button {
+    display: none;
+  }
+}
+.mode-field .segmented {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mode-field .segmented label {
+  flex-direction: column;
+  text-align: center;
+  min-height: 90px;
+}
+.matching-container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+.matching-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.matching-column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  gap: 13px;
+}
+.matching-column h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.matching-tiles {
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+.matching-tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  min-height: 80px;
+  padding: 17px;
+  border: 1px solid #d9e4dc;
+  border-radius: 6px;
+  background: white;
+  font-size: 18px;
+  line-height: 1.5;
+  text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.matching-tile > span:first-child {
+  overflow-wrap: anywhere;
+}
+.matching-symbol {
+  width: 18px;
+  height: 18px;
+}
+.matching-tile:hover:not(:disabled) {
+  background: #f0f7f2;
+  border-color: #a7c1ae;
+}
+.matching-tile.selected {
+  border-color: var(--green);
+  background: #e5f2e9;
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+.matching-tile.incorrect {
+  border-color: #cda286;
+  background: #fcf0e5;
+}
+.matching-tile.matched:disabled {
+  color: var(--green);
+  border-color: #c6decf;
+  background: #eef6f0;
+  opacity: 0.6;
+}
+.matching-feedback {
+  min-height: 46px;
+  padding: 14px 0 0;
+  font-size: 14px;
+  color: var(--green);
+}
+.matching-feedback.incorrect {
+  color: #8b5f3f;
+}
+.matching-container .answer-button {
+  margin-top: 5px;
+}
+@media (max-width: 600px) {
+  .matching-board {
+    gap: 10px;
+  }
+  .matching-tiles {
+    gap: 10px;
+  }
+  .matching-tile {
+    min-height: 72px;
+    padding: 12px 9px;
+    font-size: 16px;
+    gap: 6px;
+  }
+}
 .entry-origin {
   display: block;
   font-size: 11px;

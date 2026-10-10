@@ -741,6 +741,221 @@ test('MORE! 2 additions preserve edited vocabulary and approval in an existing l
   )
 })
 
+test('matching pairs supports either-side selection, mismatch recovery, stable positions, scores and retries', async ({
+  page,
+}) => {
+  await openReview(page)
+  await page.getByRole('button', { name: 'Save & approve' }).click()
+  await page.getByRole('button', { name: 'Practice', exact: true }).click()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await expect(page.getByLabel('Words per round')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const englishGroup = page.getByRole('group', {
+    name: 'English matching words',
+  })
+  const germanGroup = page.getByRole('group', { name: 'German matching words' })
+  await expect(englishGroup.getByRole('button')).toHaveCount(5)
+  await expect(germanGroup.getByRole('button')).toHaveCount(5)
+  await expect(englishGroup.getByRole('button').first()).toBeFocused()
+  const english = await englishGroup
+    .locator('.matching-tile > span:first-child')
+    .allTextContents()
+  const german = await germanGroup
+    .locator('.matching-tile > span:first-child')
+    .allTextContents()
+  const words = english.map((text) =>
+    unit.entries.find((entry) => entry.english === text)!,
+  )
+  expect(german).not.toEqual(words.map((entry) => entry.german))
+  const first = page.getByRole('button', {
+    name: `English: ${words[0].english}`,
+    exact: true,
+  })
+  await first.press('Enter')
+  await expect(first).toHaveAttribute('aria-pressed', 'true')
+  await first.click()
+  await expect(page.locator('.matching-tile.selected')).toHaveCount(0)
+  await first.click()
+  await page
+    .getByRole('button', { name: `English: ${words[1].english}`, exact: true })
+    .click()
+  await expect(page.locator('.matching-tile.selected')).toHaveCount(1)
+  await first.click()
+  await page
+    .getByRole('button', { name: `Deutsch: ${words[1].german}`, exact: true })
+    .click()
+  await expect(page.getByRole('status')).toContainText('Not a match')
+  await expect(page.locator('.matching-tile.incorrect')).toHaveCount(2)
+  await expect(page.locator('.matching-tile:disabled')).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'See results', exact: true }),
+  ).toBeDisabled()
+  expect(
+    await englishGroup
+      .locator('.matching-tile > span:first-child')
+      .allTextContents(),
+  ).toEqual(english)
+  expect(
+    await germanGroup
+      .locator('.matching-tile > span:first-child')
+      .allTextContents(),
+  ).toEqual(german)
+  await page
+    .getByRole('button', { name: `Deutsch: ${words[0].german}`, exact: true })
+    .click()
+  await first.click()
+  await expect(
+    page.getByRole('button', {
+      name: `English: ${words[0].english} (matched)`,
+      exact: true,
+    }),
+  ).toBeDisabled()
+  await expect(
+    page.getByRole('button', {
+      name: `Deutsch: ${words[0].german} (matched)`,
+      exact: true,
+    }),
+  ).toBeDisabled()
+  await expect(
+    page.getByRole('progressbar', { name: 'Matching progress' }),
+  ).toHaveAttribute('value', '1')
+  for (const entry of words.slice(1)) {
+    await page
+      .getByRole('button', { name: `English: ${entry.english}`, exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
+      .click()
+  }
+  await expect(page.getByRole('status')).toContainText('All pairs matched!')
+  await expect(page.locator('.matching-tile:disabled')).toHaveCount(10)
+  await page.getByRole('button', { name: 'See results', exact: true }).click()
+  await expect(page.locator('.score')).toHaveText('4 / 5')
+  await expect(
+    page.getByText('first-try matches', { exact: true }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Retry missed words' }).click()
+  await expect(
+    page.getByRole('button', {
+      name: `English: ${words[0].english}`,
+      exact: true,
+    }),
+  ).toBeVisible()
+  const retryWords = await englishGroup
+    .locator('.matching-tile > span:first-child')
+    .allTextContents()
+  expect(retryWords).toHaveLength(5)
+  for (const text of retryWords) {
+    const entry = unit.entries.find((item) => item.english === text)!
+    await page
+      .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: `English: ${entry.english}`, exact: true })
+      .click()
+  }
+  await page.getByRole('button', { name: 'See results', exact: true }).click()
+  await expect(page.locator('.score')).toHaveText('5 / 5')
+})
+
+test('small matching units use fewer pairs and ambiguous translations do not appear together', async ({
+  page,
+}) => {
+  const pairs = [
+    { english: 'she', german: 'sie', example: null },
+    { english: 'they', german: 'sie', example: null },
+    { english: 'book', german: 'Buch', example: null },
+  ]
+  await page.addInitScript(
+    (data) =>
+      localStorage.setItem('ourlingo.more-1-unit-1.v1', JSON.stringify(data)),
+    { ...unit, reviewStatus: 'approved', entries: pairs },
+  )
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.locator('.matching-tile')).toHaveCount(4)
+  const english = await page
+    .getByRole('group', { name: 'English matching words' })
+    .locator('.matching-tile > span:first-child')
+    .allTextContents()
+  expect(
+    english.filter((text) => text === 'she' || text === 'they'),
+  ).toHaveLength(1)
+  for (const text of english) {
+    const entry = pairs.find((item) => item.english === text)!
+    await page
+      .getByRole('button', { name: `English: ${text}`, exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
+      .click()
+  }
+  await page.getByRole('button', { name: 'See results', exact: true }).click()
+  await expect(page.locator('.score')).toHaveText('2 / 2')
+})
+
+test('a single pair cannot start matching but typed answers remain available', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    (data) =>
+      localStorage.setItem('ourlingo.more-1-unit-1.v1', JSON.stringify(data)),
+    { ...unit, reviewStatus: 'approved', entries: unit.entries.slice(0, 1) },
+  )
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.getByRole('alert')).toContainText(
+    'at least two distinct translations',
+  )
+  await expect(page.locator('.matching-board')).toHaveCount(0)
+  await page.getByText('Type answer', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.getByLabel('In English', { exact: true })).toBeVisible()
+})
+
+test('five short matching pairs are visible together on a phone without shrinking the text', async ({
+  page,
+}) => {
+  const pairs = [
+    { english: 'book', german: 'Buch', example: null },
+    { english: 'pen', german: 'Stift', example: null },
+    { english: 'house', german: 'Haus', example: null },
+    { english: 'tree', german: 'Baum', example: null },
+    { english: 'sun', german: 'Sonne', example: null },
+  ]
+  await page.addInitScript(
+    (data) =>
+      localStorage.setItem('ourlingo.more-1-unit-1.v1', JSON.stringify(data)),
+    { ...unit, reviewStatus: 'approved', entries: pairs },
+  )
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.locator('.matching-tile')).toHaveCount(10)
+  await expect(page.locator('.matching-tile').first()).toHaveCSS(
+    'font-size',
+    '16px',
+  )
+  const lastTile = await page.locator('.matching-tile').last().boundingBox()
+  expect(lastTile).toBeTruthy()
+  expect(lastTile!.y + lastTile!.height).toBeLessThanOrEqual(844)
+  await page.screenshot({
+    path: '/tmp/ourlingo-matching-five-visible-phone.png',
+  })
+})
+
 for (const width of [1440, 768, 390, 320]) {
   test(`review and practice fit the ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -850,5 +1065,39 @@ for (const width of [1440, 768, 390, 320]) {
     await page.screenshot({
       path: `/tmp/ourlingo-multiple-choice-${width}.png`,
     })
+    page.once('dialog', (dialog) => dialog.accept())
+    await page
+      .getByRole('button', { name: 'Back to practice', exact: true })
+      .click()
+    await page.getByText('Matching pairs', { exact: true }).click()
+    await page.getByRole('button', { name: 'Start practice' }).click()
+    await expect(page.locator('.matching-tile')).toHaveCount(10)
+    await expect(
+      page
+        .getByRole('group', { name: 'English matching words' })
+        .getByRole('button'),
+    ).toHaveCount(5)
+    await expect(
+      page
+        .getByRole('group', { name: 'German matching words' })
+        .getByRole('button'),
+    ).toHaveCount(5)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true)
+    expect(
+      await page
+        .locator('.matching-tile')
+        .evaluateAll((tiles) =>
+          tiles.every(
+            (tile) =>
+              tile.scrollWidth <= tile.clientWidth &&
+              tile.scrollHeight <= tile.clientHeight,
+          ),
+        ),
+    ).toBe(true)
+    await page.screenshot({ path: `/tmp/ourlingo-matching-${width}.png` })
   })
 }

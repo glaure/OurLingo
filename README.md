@@ -13,6 +13,8 @@ A family vocabulary learning app with MORE! 1, Units 1-2, and MORE! 2, Units 1-3
 - Approve and save a unit before practising it.
 - Practise in either direction with 5, 10 or all words, then retry missed words.
 - Choose typed answers or multiple choice. Multiple choice has one correct answer and up to three distinct distractors, excluding known overlapping translations and prompts. Small units use fewer choices; questions without a safe distractor are omitted.
+- Matching pairs shows up to five English words on the left and their German translations independently shuffled on the right. Select either side first; correct pairs stay in place and lock, while a wrong match can be tried again. Boards exclude overlapping answers in both languages and need at least two unambiguous pairs.
+- Matching results count first-try matches. Retry boards prioritise missed words and add other words from the same unit to fill the five-pair board. Matching uses both languages together and does not use the direction or round-size settings.
 - Accept listed translation alternatives, optional workbook forms, and differences in case or final punctuation.
 - Download a JSON copy of vocabulary, including unsaved edits.
 - Responsive review and practice layouts for desktop, tablets and phones.
