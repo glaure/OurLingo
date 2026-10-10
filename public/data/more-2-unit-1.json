@@ -4,7 +4,7 @@
   "unit": 1,
   "title": "School subjects",
   "source": "User-provided workbook photo, manually transcribed; Word File German translations suggested separately",
-  "reviewStatus": "pending",
+  "reviewStatus": "approved",
   "entries": [
     { "english": "glad", "german": "froh", "example": "I was glad to stay at home." },
     { "english": "kilometre", "german": "Kilometer", "example": "My school is one kilometre from my house." },

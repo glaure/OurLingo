@@ -29,19 +29,23 @@ import {
   createAnswerChoices,
   createMatchingRound,
   createRound,
+  isLearningProgress,
   isCorrectAnswer,
   isVocabularyLibrary,
   isVocabularyUnit,
+  learningProgressStorageKey,
   libraryStorageKey,
   mergeBundledUnits,
   storageKey,
   unitKey,
   upsertUnit,
+  updateLearningProgress,
   validateEntries,
 } from './vocabulary'
 import type {
   AnswerChoice,
   Entry,
+  LearningProgress,
   VocabularyLibrary,
   VocabularyUnit,
 } from './vocabulary'
@@ -50,9 +54,25 @@ import './OurLingo.css'
 type Direction = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
+declare const __APP_VERSION__: string
+const matchingPasses = 3
+
+function loadLearningProgress(): LearningProgress {
+  const empty: LearningProgress = { schemaVersion: 1, records: [] }
+  try {
+    const saved = localStorage.getItem(learningProgressStorageKey)
+    if (!saved) return empty
+    const parsed: unknown = JSON.parse(saved)
+    return isLearningProgress(parsed) ? parsed : empty
+  } catch {
+    return empty
+  }
+}
 
 export default function OurLingo() {
   const [library, setLibrary] = useState<VocabularyLibrary | null>(null)
+  const [learningProgress, setLearningProgress] =
+    useState<LearningProgress>(loadLearningProgress)
   const [unit, setUnit] = useState<VocabularyUnit | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [loadError, setLoadError] = useState('')
@@ -60,7 +80,9 @@ export default function OurLingo() {
   const [warning, setWarning] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [space, setSpace] = useState<'kid' | 'parent'>('kid')
-  const [view, setView] = useState<'library' | 'review' | 'practice'>('library')
+  const [view, setView] = useState<
+    'library' | 'review' | 'practice' | 'report'
+  >('library')
   const [bookFilter, setBookFilter] = useState<'all' | VocabularyUnit['book']>(
     'all',
   )
@@ -85,6 +107,10 @@ export default function OurLingo() {
   } | null>(null)
   const [matchedPairs, setMatchedPairs] = useState<number[]>([])
   const [matchingMistakes, setMatchingMistakes] = useState<number[]>([])
+  const [matchingFirstPassMistakes, setMatchingFirstPassMistakes] = useState<
+    number[]
+  >([])
+  const [matchingPass, setMatchingPass] = useState(1)
   const [matchingFeedback, setMatchingFeedback] = useState<
     'idle' | 'correct' | 'incorrect'
   >('idle')
@@ -113,7 +139,11 @@ export default function OurLingo() {
       let updated = currentLibrary
       const failed: string[] = []
       for (const bundled of bundledUnitFiles) {
-        if (updated.bundledUnitKeys?.includes(unitKey(bundled))) continue
+        const key = unitKey(bundled)
+        const installed = updated.bundledUnitKeys?.includes(key)
+        const existing = updated.units.find((unit) => unitKey(unit) === key)
+        if (installed && (!existing || existing.reviewStatus === 'approved'))
+          continue
         if (controller.signal.aborted) return updated
         try {
           const response = await fetch(
@@ -456,9 +486,9 @@ export default function OurLingo() {
     }
   }
 
-  function goTo(next: 'library' | 'review' | 'practice') {
+  function goTo(next: 'library' | 'review' | 'practice' | 'report') {
     if (next === 'practice' && !approved) return
-    if (next === 'review' && space !== 'parent') return
+    if ((next === 'review' || next === 'report') && space !== 'parent') return
     if (next === view || !mayLeave()) return
     setView(next)
     setMessage('')
@@ -478,6 +508,8 @@ export default function OurLingo() {
     setMatchingSelection(null)
     setMatchedPairs([])
     setMatchingMistakes([])
+    setMatchingFirstPassMistakes([])
+    setMatchingPass(1)
     setMatchingFeedback('idle')
     setMatchingError(null)
   }
@@ -547,9 +579,31 @@ export default function OurLingo() {
           : choices.find((choice) => choice.text === answer)?.correct === true,
     })
   }
+  function saveLearningResults(completedResults: Result[]) {
+    if (!unit || !completedResults.length) return
+    try {
+      const updated = updateLearningProgress(
+        learningProgress,
+        unit,
+        completedResults.map(({ entry, correct }) => ({
+          english: entry.english,
+          german: entry.german,
+          correct,
+        })),
+        new Date().toISOString(),
+      )
+      localStorage.setItem(learningProgressStorageKey, JSON.stringify(updated))
+      setLearningProgress(updated)
+    } catch {
+      setWarning('Practice finished, but progress could not be saved on this device.')
+    }
+  }
   function nextQuestion() {
     if (!feedback) return
-    setResults((previous) => [...previous, feedback])
+    const completedResults = [...results, feedback]
+    if (completedResults.length === round.length)
+      saveLearningResults(completedResults)
+    setResults(completedResults)
     setFeedback(null)
     setAnswer('')
   }
@@ -579,15 +633,37 @@ export default function OurLingo() {
     }
   }
 
-  function finishMatchingRound() {
+  function finishMatchingPass() {
     if (matchedPairs.length !== round.length) return
-    setResults(
-      round.map((entry, index) => ({
-        entry,
-        answer: entry.german,
-        correct: !matchingMistakes.includes(index),
-      })),
-    )
+    if (matchingPass === 1) setMatchingFirstPassMistakes(matchingMistakes)
+    if (matchingPass < matchingPasses) {
+      setMatchingPass((previous) => previous + 1)
+      const english = createRound(round, round.length).map((entry) =>
+        round.indexOf(entry),
+      )
+      const german = createRound(round, round.length).map((entry) =>
+        round.indexOf(entry),
+      )
+      if (english.every((index, position) => index === german[position]))
+        german.push(german.shift()!)
+      setMatchingEnglish(english)
+      setMatchingGerman(german)
+      setMatchedPairs([])
+      setMatchingMistakes([])
+      setMatchingSelection(null)
+      setMatchingError(null)
+      setMatchingFeedback('idle')
+      return
+    }
+    const firstPassMistakes =
+      matchingPass === 1 ? matchingMistakes : matchingFirstPassMistakes
+    const completedResults = round.map((entry, index) => ({
+      entry,
+      answer: entry.german,
+      correct: !firstPassMistakes.includes(index),
+    }))
+    saveLearningResults(completedResults)
+    setResults(completedResults)
   }
 
   const visibleEntries = entries
@@ -644,6 +720,15 @@ export default function OurLingo() {
               </button>
             </>
           )}
+          {space === 'parent' && (
+            <button
+              className={view === 'report' ? 'nav-link active' : 'nav-link'}
+              onClick={() => goTo('report')}
+            >
+              <ListChecks size={19} />
+              Learning report
+            </button>
+          )}
           <button
             className={view === 'practice' ? 'nav-link active' : 'nav-link'}
             disabled={!approved}
@@ -680,14 +765,23 @@ export default function OurLingo() {
         <header className="topbar">
           <div className="breadcrumb">
             <BookOpen size={17} />
-            <span>{view === 'library' ? 'OurLingo' : unit?.book}</span>
+            <span>
+              {view === 'library' || view === 'report' ? 'OurLingo' : unit?.book}
+            </span>
             <ChevronRight size={14} />
             <strong>
-              {view === 'library' ? 'My units' : `Unit ${unit?.unit}`}
+              {view === 'library'
+                ? 'My units'
+                : view === 'report'
+                  ? 'Learning report'
+                  : `Unit ${unit?.unit}`}
             </strong>
           </div>
           <div className="topbar-actions">
-            {space === 'parent' && unit && view !== 'library' && (
+            {space === 'parent' &&
+              unit &&
+              view !== 'library' &&
+              view !== 'report' && (
               <>
                 <button
                   className="icon-button"
@@ -724,15 +818,19 @@ export default function OurLingo() {
                     : 'Your unit library'
                   : view === 'review'
                     ? `Unit ${unit?.unit} vocabulary`
-                    : 'A little practice'}
+                    : view === 'report'
+                      ? 'Learning report'
+                      : 'A little practice'}
               </h1>
               <p>
                 {view === 'library'
                   ? 'MORE! 1 + MORE! 2 · English / Deutsch'
+                  : view === 'report'
+                    ? 'Progress saved on this device'
                   : `${unit?.book} · Unit ${unit?.unit}`}
               </p>
             </div>
-            {view !== 'library' && (
+            {view !== 'library' && view !== 'report' && (
               <>
                 <span className={`status-badge ${approved ? 'approved' : ''}`}>
                   <span />
@@ -953,6 +1051,119 @@ export default function OurLingo() {
                   <h2>No units here yet.</h2>
                 </div>
               )}
+            </section>
+          )}
+          {library && space === 'parent' && view === 'report' && (
+            <section className="learning-report" aria-label="Learning report">
+              <p className="report-note">
+                Progress is private to this device. A word is known after three
+                correct first attempts in a row; any miss resets its streak.
+              </p>
+              {library.units.map((reportUnit) => {
+                const records = new Map(
+                  learningProgress.records
+                    .filter(
+                      (record) =>
+                        record.book === reportUnit.book &&
+                        record.unit === reportUnit.unit,
+                    )
+                    .map((record) => [record.english, record]),
+                )
+                const known = reportUnit.entries.filter(
+                  (entry) => (records.get(entry.english)?.correctStreak ?? 0) >= 3,
+                )
+                const inProgress = reportUnit.entries.filter((entry) => {
+                  const record = records.get(entry.english)
+                  return (
+                    !!record &&
+                    record.correctStreak < 3 &&
+                    record.correctAttempts + record.incorrectAttempts > 0
+                  )
+                })
+                const notTried = reportUnit.entries.filter(
+                  (entry) => !records.has(entry.english),
+                )
+                return (
+                  <section
+                    className="report-unit"
+                    aria-label={`${reportUnit.book} Unit ${reportUnit.unit} progress`}
+                    key={unitKey(reportUnit)}
+                  >
+                    <div className="report-unit-heading">
+                      <div>
+                        <span>{reportUnit.book}</span>
+                        <h2>Unit {reportUnit.unit}</h2>
+                        <p>
+                          {reportUnit.title === `Unit ${reportUnit.unit}`
+                            ? reportUnit.book
+                            : reportUnit.title}
+                        </p>
+                      </div>
+                      <strong>
+                        {known.length} <span>/ {reportUnit.entries.length} known</span>
+                      </strong>
+                    </div>
+                    <progress
+                      max={reportUnit.entries.length || 1}
+                      value={known.length}
+                      aria-label={`${reportUnit.book} Unit ${reportUnit.unit} known words`}
+                    />
+                    <div className="report-word-groups">
+                      <details>
+                        <summary>Known ({known.length})</summary>
+                        {known.length ? (
+                          <ul>
+                            {known.map((entry) => (
+                              <li key={entry.english}>
+                                <strong>{entry.english}</strong>
+                                <span>{entry.german}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p>No words are known yet.</p>
+                        )}
+                      </details>
+                      <details>
+                        <summary>Still learning ({inProgress.length})</summary>
+                        {inProgress.length ? (
+                          <ul>
+                            {inProgress.map((entry) => {
+                              const record = records.get(entry.english)!
+                              return (
+                                <li key={entry.english}>
+                                  <strong>{entry.english}</strong>
+                                  <span>{entry.german}</span>
+                                  <small>
+                                    {record.correctAttempts} correct, {record.incorrectAttempts} missed; streak {record.correctStreak}/3
+                                  </small>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        ) : (
+                          <p>No words in progress.</p>
+                        )}
+                      </details>
+                      <details>
+                        <summary>Not tried ({notTried.length})</summary>
+                        {notTried.length ? (
+                          <ul>
+                            {notTried.map((entry) => (
+                              <li key={entry.english}>
+                                <strong>{entry.english}</strong>
+                                <span>{entry.german}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p>Every word has been tried.</p>
+                        )}
+                      </details>
+                    </div>
+                  </section>
+                )
+              })}
             </section>
           )}
           {unit && space === 'parent' && view === 'review' && (
@@ -1297,7 +1508,9 @@ export default function OurLingo() {
               {round.length > 0 && practiceMode === 'matching' && !complete && (
                 <div className="matching-container">
                   <div className="round-top">
-                    <span>Matching pairs</span>
+                    <span>
+                      Matching pairs - Pass {matchingPass} of {matchingPasses}
+                    </span>
                     <span>
                       {matchedPairs.length} of {round.length} matched
                     </span>
@@ -1366,7 +1579,9 @@ export default function OurLingo() {
                     role="status"
                   >
                     {matchedPairs.length === round.length
-                      ? 'All pairs matched!'
+                      ? matchingPass < matchingPasses
+                        ? 'Pass complete. Get ready for the next pass!'
+                        : 'All three passes complete!'
                       : matchingFeedback === 'correct'
                         ? "That's a pair!"
                         : matchingFeedback === 'incorrect'
@@ -1376,9 +1591,9 @@ export default function OurLingo() {
                   <button
                     className="button primary answer-button"
                     disabled={matchedPairs.length !== round.length}
-                    onClick={finishMatchingRound}
+                    onClick={finishMatchingPass}
                   >
-                    See results
+                    {matchingPass < matchingPasses ? 'Next pass' : 'See results'}
                     <ArrowRight size={17} />
                   </button>
                   <button
@@ -1610,7 +1825,12 @@ export default function OurLingo() {
             </section>
           )}
           <footer className="page-footer">
-            <span>OurLingo</span>
+            <span>
+              OurLingo{' '}
+              <small aria-label={`App version ${__APP_VERSION__}`}>
+                v{__APP_VERSION__}
+              </small>
+            </span>
             <span>A word at a time.</span>
           </footer>
         </main>

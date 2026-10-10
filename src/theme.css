@@ -19,6 +19,27 @@
   letter-spacing: 0;
   color-scheme: light;
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #e3ece6;
+    background: #141a16;
+    --ink: #e3ece6;
+    --muted: #a4b2a9;
+    --green: #79c79b;
+    --green-dark: #5cad82;
+    --mint: #263b30;
+    --line: #35483d;
+    --peach: #44332d;
+    --yellow: #403a28;
+    color-scheme: dark;
+  }
+  body {
+    background: #141a16;
+  }
+  ::selection {
+    background: #345441;
+  }
+}
 * {
   box-sizing: border-box;
 }

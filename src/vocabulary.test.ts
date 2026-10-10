@@ -7,10 +7,13 @@ import {
   createMatchingRound,
   createRound,
   isCorrectAnswer,
+  isLearningProgress,
   isVocabularyLibrary,
   isVocabularyUnit,
+  learningProgressStorageKey,
   mergeBundledUnits,
   unitKey,
+  updateLearningProgress,
   upsertUnit,
   validateEntries,
 } from './vocabulary.ts'
@@ -34,7 +37,7 @@ assert.ok(isVocabularyUnit(unitTwo))
 test('Unit 2 transcription has 41 entries, 37 examples, and the correct book and review status', () => {
   assert.equal(unitTwo.book, 'MORE! 1')
   assert.equal(unitTwo.unit, 2)
-  assert.equal(unitTwo.reviewStatus, 'pending')
+  assert.equal(unitTwo.reviewStatus, 'approved')
   assert.equal(unitTwo.entries.length, 41)
   assert.equal(unitTwo.entries.filter((entry) => entry.example).length, 37)
   assert.equal(validateEntries(unitTwo.entries), null)
@@ -87,13 +90,18 @@ test('new bundled units preserve edits and approvals and do not return after del
 })
 
 test('empty drafts get the transcription but populated Unit 2 is never overwritten', () => {
-  const draft = { ...unitTwo, title: 'My zoo words', entries: [] }
+  const draft = {
+    ...unitTwo,
+    title: 'My zoo words',
+    reviewStatus: 'pending' as const,
+    entries: [],
+  }
   const installed = mergeBundledUnits({ schemaVersion: 1, units: [draft] }, [
     unitTwo,
   ])
   assert.equal(installed.units[0].title, 'My zoo words')
   assert.equal(installed.units[0].entries.length, 41)
-  assert.equal(installed.units[0].reviewStatus, 'pending')
+  assert.equal(installed.units[0].reviewStatus, 'approved')
   const edited = {
     ...unitTwo,
     reviewStatus: 'approved' as const,
@@ -117,6 +125,62 @@ const moreTwoUnits = [1, 2, 3].map((number) => {
   return data
 })
 
+test('bundled units are approved without overwriting edits, drafts, or deletions', () => {
+  const bundledUnits = [unit, unitTwo, ...moreTwoUnits]
+  const editedUnit = {
+    ...unit,
+    reviewStatus: 'pending' as const,
+    entries: [{ ...unit.entries[0], german: 'geben; aushändigen' }],
+  }
+  const parentDraft = {
+    ...unit,
+    unit: 9,
+    title: 'Parent draft',
+    reviewStatus: 'pending' as const,
+    entries: [unit.entries[0]],
+  }
+  const library = {
+    schemaVersion: 1 as const,
+    units: [
+      editedUnit,
+      ...bundledUnits.slice(1).map((bundled) => ({
+        ...bundled,
+        reviewStatus: 'pending' as const,
+      })),
+      parentDraft,
+    ],
+    bundledUnitKeys: bundledUnits.map(unitKey),
+  }
+
+  const approved = mergeBundledUnits(library, bundledUnits)
+  for (const bundled of bundledUnits) {
+    const saved = approved.units.find(
+      (candidate) => unitKey(candidate) === unitKey(bundled),
+    )
+    assert.equal(saved?.reviewStatus, 'approved')
+  }
+  assert.equal(
+    approved.units.find((candidate) => candidate.unit === 1)?.entries[0].german,
+    'geben; aushändigen',
+  )
+  assert.equal(
+    approved.units.find((candidate) => candidate.unit === 9)?.reviewStatus,
+    'pending',
+  )
+
+  const deleted = {
+    ...approved,
+    units: approved.units.filter(
+      (candidate) => unitKey(candidate) !== unitKey(unitTwo),
+    ),
+  }
+  const reloaded = mergeBundledUnits(deleted, bundledUnits)
+  assert.equal(
+    reloaded.units.some((candidate) => unitKey(candidate) === unitKey(unitTwo)),
+    false,
+  )
+})
+
 test('MORE! 2 photo transcriptions preserve table examples and mark suggested Word File translations', () => {
   const counts = [
     [45, 34, 11],
@@ -126,7 +190,7 @@ test('MORE! 2 photo transcriptions preserve table examples and mark suggested Wo
   for (const [index, data] of moreTwoUnits.entries()) {
     assert.equal(data.book, 'MORE! 2')
     assert.equal(data.unit, index + 1)
-    assert.equal(data.reviewStatus, 'pending')
+    assert.equal(data.reviewStatus, 'approved')
     assert.equal(data.entries.length, counts[index][0])
     assert.equal(
       data.entries.filter((entry) => entry.example).length,
@@ -397,4 +461,34 @@ test('empty units are valid drafts but cannot be approved; duplicate identities 
   )
   assert.equal(isVocabularyLibrary({ schemaVersion: 1, units: [null] }), false)
   assert.equal(isVocabularyLibrary({ schemaVersion: 2, units: [] }), false)
+})
+
+test('learning progress tracks first attempts and resets mastery streaks after a miss', () => {
+  const empty = { schemaVersion: 1 as const, records: [] }
+  const entry = unit.entries[0]
+  const attempt = {
+    english: entry.english,
+    german: entry.german,
+    correct: true,
+  }
+  const firstRound = updateLearningProgress(empty, unit, [attempt], '2026-10-10T12:00:00.000Z')
+  const secondRound = updateLearningProgress(firstRound, unit, [attempt], '2026-10-11T12:00:00.000Z')
+  const thirdRound = updateLearningProgress(secondRound, unit, [attempt], '2026-10-12T12:00:00.000Z')
+  assert.equal(thirdRound.records[0].correctStreak, 3)
+  assert.equal(thirdRound.records[0].correctAttempts, 3)
+  assert.equal(thirdRound.records[0].incorrectAttempts, 0)
+  assert.equal(thirdRound.records[0].lastPracticedAt, '2026-10-12T12:00:00.000Z')
+
+  const missedRound = updateLearningProgress(
+    thirdRound,
+    unit,
+    [{ ...attempt, correct: false }],
+    '2026-10-13T12:00:00.000Z',
+  )
+  assert.equal(missedRound.records[0].correctStreak, 0)
+  assert.equal(missedRound.records[0].correctAttempts, 3)
+  assert.equal(missedRound.records[0].incorrectAttempts, 1)
+  assert.equal(isLearningProgress(missedRound), true)
+  assert.equal(isLearningProgress({ schemaVersion: 1, records: [{ ...attempt }] }), false)
+  assert.equal(learningProgressStorageKey, 'ourlingo.learning.v1')
 })

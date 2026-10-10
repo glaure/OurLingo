@@ -12,11 +12,14 @@ For the Windows workspace transition and proposed Tauri v2 packaging work, see [
 - Review user-photo transcriptions: MORE! 1 has 42/41 entries in Units 1/2; MORE! 2 has 45/39/33 entries in Units 1/2/3.
 - Word File illustrations are included with explicitly labelled suggested German translations. Editing those translations marks them as parent translations; their provenance is preserved on save and download.
 - Edit English, German and examples, search across all fields, and add or remove entries.
-- Approve and save a unit before practising it.
+- The five bundled lessons are ready to practise; parent-created units require approval first.
 - Practise in either direction with 5, 10 or all words, then retry missed words.
 - Choose typed answers or multiple choice. Multiple choice has one correct answer and up to three distinct distractors, excluding known overlapping translations and prompts. Small units use fewer choices; questions without a safe distractor are omitted.
 - Matching pairs shows up to five English words on the left and their German translations independently shuffled on the right. Select either side first; correct pairs stay in place and lock, while a wrong match can be tried again. Boards exclude overlapping answers in both languages and need at least two unambiguous pairs.
-- Matching results count first-try matches. Retry boards prioritise missed words and add other words from the same unit to fill the five-pair board. Matching uses both languages together and does not use the direction or round-size settings.
+- Each matching board repeats for three full passes, reshuffling between passes. Results appear after pass three and score first-try matches from pass one. Retry boards prioritise missed words and add other words from the same unit to fill the five-pair board. Matching uses both languages together and does not use the direction or round-size settings.
+- Parent space includes a learning report with known, still-learning and not-tried words for each unit. A word is marked known after three correct first attempts in a row.
+- The app version is visible in the page footer.
+- The interface follows the device's light or dark appearance setting.
 - Accept listed translation alternatives, optional workbook forms, and differences in case or final punctuation.
 - Download a JSON copy of vocabulary, including unsaved edits.
 - Responsive review and practice layouts for desktop, tablets and phones.
@@ -158,7 +161,7 @@ Use `adb devices -l` to confirm a device is connected. Test the packaged app wit
 
 ## Data and Limitations
 
-The bundled datasets under `public/data/` cover MORE! 1, Units 1-2, and MORE! 2, Units 1-3. They are manual transcriptions of user-provided photos, not automated OCR results. All new units remain pending until approved in the app.
+The bundled datasets under `public/data/` cover MORE! 1, Units 1-2, and MORE! 2, Units 1-3. They are manual transcriptions of user-provided photos, not automated OCR results. These five test lessons are approved for immediate practice. Parent-created units still start pending until approved. Existing saved edits are preserved when approval is migrated; deleted bundled lessons stay deleted.
 
 Each additional bundled unit is added once to existing libraries without replacing populated units or their approval. Empty pending drafts receive the matching transcription, retaining their titles. `bundledUnitKeys` remembers imported units so deletion stays permanent. A failed download does not prevent other units loading or remove saved vocabulary; refreshing retries failed additions. The files to load are listed in `bundledUnitFiles` in `src/vocabulary.ts`.
 
@@ -170,7 +173,7 @@ In parent space, choose **Add unit**, select the book and unit number, and optio
 
 The five supplied units come with photo transcriptions and the marked Word File suggestions. Other units must be entered by a parent; no textbook contents are invented. Saved data is not written back to source files or synchronized to other devices. Clearing site data removes the library. JSON downloads copy the selected unit, including unsaved edits; restore/import is not implemented yet.
 
-Practice scores last for the current round only. Separate learner profiles, persistent learning progress, image uploads and automated page scanning are not implemented yet.
+Round scores are shown after each round. Per-word first-attempt counts and correct streaks are saved locally under `ourlingo.learning.v1`; the parent report marks a word known after three correct completed rounds in a row. Progress is separate on every browser/app installation and does not sync between devices. There are no separate learner profiles yet. Image uploads and automated page scanning are not implemented.
 
 The app does not translate automatically or judge unlisted synonyms. German umlauts matter. Example sentences are shown after an answer, not used as answer targets.
 

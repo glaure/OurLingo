@@ -4,7 +4,7 @@
   "unit": 1,
   "title": "MORE Words and Phrases",
   "source": "User-provided workbook photo, manually transcribed",
-  "reviewStatus": "pending",
+  "reviewStatus": "approved",
   "entries": [
     { "english": "to give", "german": "geben", "example": "Give me your school bag." },
     { "english": "time", "german": "Zeit", "example": "It's time for school." },

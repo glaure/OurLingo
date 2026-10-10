@@ -4,7 +4,7 @@
   "unit": 3,
   "title": "Halloween",
   "source": "User-provided workbook photo, manually transcribed; Word File German translations suggested separately",
-  "reviewStatus": "pending",
+  "reviewStatus": "approved",
   "entries": [
     { "english": "tradition", "german": "Tradition", "example": "What's your favourite Halloween tradition?" },
     { "english": "to fear", "german": "(sich) fürchten (vor)", "example": "We do not fear the zombies." },

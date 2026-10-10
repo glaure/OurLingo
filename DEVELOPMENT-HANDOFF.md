@@ -8,7 +8,7 @@ OurLingo is a vocabulary learning app for the user's daughters, accompanying MOR
 
 The user wants installed Windows and Android apps and has chosen to investigate Tauri v2. Tauri v2 can package the existing React interface for Windows, Android, macOS, Linux and iOS. Start with Android, then Windows, retaining the browser version.
 
-Tauri v2 is now integrated into the existing Vite app. The Tauri CLI, Vite configuration, Rust project and generated Android project are present. An arm64 debug APK builds and installs in the Android 37 emulator; the app loads all five bundled units with emulator networking disabled, review/approval works in the emulator's separate local storage, and typed practice accepts a correct answer offline. Multiple-choice and matching practice, a physical-device test, full-library backup/restore and Windows desktop build remain outstanding.
+Tauri v2 is integrated into the existing Vite app. The Tauri CLI, Vite configuration, Rust project and generated Android project are present. Bundled units are approved by default and already-installed pending bundles migrate without overwriting edits or restoring deletions. An arm64 debug APK builds and installs in the Android 37 emulator; bundled units load with networking disabled, and typed practice works offline. The launcher icon matches the app's BookOpen mark. Matching now uses three shuffled passes in the browser app; native offline matching still needs testing. A physical-device test, full-library backup/restore and Windows desktop build remain outstanding.
 
 The current Windows machine has Node.js 24.21.0, npm 11.19.0, Rust 1.99.0 with the MSVC toolchain, Android Studio's JDK 25, Android SDK Platforms 36 and 37, Build-Tools 36.0.0, Command-line Tools 23.0, NDK 30.0.16248370, Visual Studio Build Tools 2022 and WebView2. Windows Developer Mode is enabled for Android build symlinks. Recheck tools and environment variables if moving to another machine.
 
@@ -55,7 +55,10 @@ Current features:
 - Parent space supports creation, review, approval and deletion of units in both books. The switch has no PIN or authentication.
 - Only approved units can be practised.
 - Typed and multiple-choice practice in both language directions, with scoring and missed-word retries.
-- Matching-pairs mode: up to five English/German pairs, independently shuffled columns, either-side-first selection, locked matched tiles, mismatch feedback and first-try scores. Retry prioritises missed words and fills from the same unit. Ambiguous or overlapping translations are excluded; small units use fewer pairs, with at least two required.
+- Matching-pairs mode: up to five English/German pairs, independently shuffled columns, either-side-first selection, locked matched tiles and mismatch feedback. Each board repeats for three full passes, reshuffling between passes; results score first-try matches from pass one. Retry prioritises missed words and fills from the same unit. Ambiguous or overlapping translations are excluded; small units use fewer pairs, with at least two required.
+- Parent-space learning report records per-word first-attempt outcomes locally. Three correct completed rounds in a row marks a word known; there are no separate learner profiles or cross-device sync.
+- The app version is displayed in the page footer and matches npm/Tauri version `0.1.0`.
+- The interface follows the operating system light/dark appearance preference.
 - Search, add/remove/edit vocabulary and example sentences; selected-unit JSON downloads include unsaved edits.
 - Responsive layouts tested at 1440, 768, 390 and 320 pixels, plus five short matching pairs visible on a 320x844 phone.
 - User-approved font sizes: vocabulary 16px, multiple-choice options 18px, typed answers 20px. Preserve this readability and existing visual style.
@@ -86,13 +89,13 @@ Bundled manual transcriptions:
 | MORE! 2 | 2 | 39 | 39 |
 | MORE! 2 | 3 | 33 | 27 |
 
-All newly installed datasets start pending review. MORE! 2 Units 1 and 3 include 11 and six illustrated Word File terms with suggested German translations, explicitly marked using origin and translationSource metadata. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
+The five bundled datasets are approved for immediate practice; parent-created units remain pending. MORE! 2 Units 1 and 3 include 11 and six illustrated Word File terms with suggested German translations, explicitly marked using origin and translationSource metadata. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
 
 Browser storage uses localStorage key `ourlingo.library.v1`. Units are identified by book plus unit number. Legacy `ourlingo.more-1-unit-1.v1` data migrates automatically with edits and approval retained. The old copy is kept.
 
 `bundledUnitFiles` lists supplementary datasets; `installBundledUnits` loads them independently. `mergeBundledUnits` preserves populated units and approvals, fills empty pending drafts while retaining titles, and records bundledUnitKeys so deleted imports do not reappear. Failed downloads do not discard saved vocabulary or prevent other bundles loading.
 
-Browser data is separate for each browser and URL origin. It is not written into Git or source JSON. Windows cloning and Tauri installation will not copy browser-saved vocabulary or approval automatically. Clearing site data removes the library. Scores currently last only for the round; there is no learner-profile system, backend or cross-device synchronization.
+Browser data is separate for each browser and URL origin. It is not written into Git or source JSON. Windows cloning and Tauri installation will not copy browser-saved vocabulary or approval automatically. Clearing site data removes the library. Progress is stored under `ourlingo.learning.v1`, separately per installation. There are no separate learner profiles, backend or cross-device synchronization.
 
 Before migrating real data, provide and test an import/restore path. Existing JSON downloads cover one selected unit, not the complete library. A full-library backup and restore workflow would be useful before switching origins or storage backends. Do not clear existing browser storage or silently replace parent edits.
 
@@ -100,7 +103,7 @@ Before migrating real data, provide and test an import/restore path. Existing JS
 
 Setup progress and remaining work:
 
-1. Windows prerequisites and the browser baseline are verified; build, lint, 18 unit tests and 27 browser tests pass.
+1. Windows prerequisites and the browser baseline are verified; build, lint, 20 unit tests and 30 browser tests pass.
 2. Tauri v2 is configured to use Vite and `dist`; Android support is initialized. `npm run tauri` is required by generated Gradle tasks.
 3. The arm64 debug APK builds at `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk` and launches in the API 37 emulator.
 4. The offline library, review/approval and a correct typed-practice answer are smoke-tested. Verify multiple-choice and matching modes offline and test a physical device.

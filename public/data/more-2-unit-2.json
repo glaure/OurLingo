@@ -4,7 +4,7 @@
   "unit": 2,
   "title": "MORE Words and Phrases",
   "source": "User-provided workbook photo, manually transcribed",
-  "reviewStatus": "pending",
+  "reviewStatus": "approved",
   "entries": [
     { "english": "online safety", "german": "Internetsicherheit", "example": "You can find helpful tips for online safety on this website." },
     { "english": "opinion", "german": "Meinung", "example": "I always say my opinion." },

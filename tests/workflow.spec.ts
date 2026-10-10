@@ -26,16 +26,41 @@ async function openReview(page: Page) {
     .click()
 }
 
+async function completeMatchingPass(
+  page: Page,
+  entries: Array<{ english: string; german: string }>,
+) {
+  const englishGroup = page.getByRole('group', {
+    name: 'English matching words',
+  })
+  const english = await englishGroup
+    .locator('.matching-tile > span:first-child')
+    .allTextContents()
+  for (const text of english) {
+    const entry = entries.find((item) => item.english === text)!
+    await page
+      .getByRole('button', { name: `English: ${entry.english}`, exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
+      .click()
+  }
+  await expect(page.getByRole('status')).toContainText(
+    /Pass complete|All three passes complete/,
+  )
+}
+
 test('review, search, edit, approve and reload saved vocabulary', async ({
   page,
 }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await openReview(page)
+  await expect(page.getByText('v0.1.0', { exact: true })).toBeVisible()
   await expect(page.locator('.vocabulary-row')).toHaveCount(42)
   await expect(
     page.getByRole('button', { name: 'Practice', exact: true }),
-  ).toBeDisabled()
+  ).toBeEnabled()
   await page.getByLabel('Search vocabulary').fill('school bag')
   await expect(page.locator('.vocabulary-row')).toHaveCount(1)
   await page.getByRole('button', { name: 'Clear search' }).click()
@@ -97,7 +122,6 @@ test('complete a round, retry a missed word, and practise the opposite direction
   page,
 }) => {
   await openReview(page)
-  await page.getByRole('button', { name: 'Save & approve' }).click()
   await page.getByRole('button', { name: 'Practice', exact: true }).click()
   await page.getByLabel('Words per round').selectOption('5')
   await page.getByRole('button', { name: 'Start practice' }).click()
@@ -160,7 +184,6 @@ for (const direction of ['english', 'german'] as const) {
     page,
   }) => {
     await openReview(page)
-    await page.getByRole('button', { name: 'Save & approve' }).click()
     await page.getByRole('button', { name: 'Practice', exact: true }).click()
     await page.getByText('Multiple choice', { exact: true }).click()
     if (direction === 'german')
@@ -329,7 +352,7 @@ test('create units in both books, keep their words separate, and practise the se
   await expect(page.locator('.unit-card')).toHaveCount(7)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
-  ).toBeDisabled()
+  ).toBeEnabled()
   await page
     .getByRole('button', { name: 'Practise MORE! 1 Unit 3', exact: true })
     .click()
@@ -452,7 +475,7 @@ test('Unit 2 installs into an existing library, supports phone review, approval 
   await page.goto('/')
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 2', exact: true }),
-  ).toBeDisabled()
+  ).toBeEnabled()
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await page
     .getByRole('button', { name: 'Review MORE! 1 Unit 2', exact: true })
@@ -474,7 +497,7 @@ test('Unit 2 installs into an existing library, supports phone review, approval 
     )
   expect(clipped).toEqual([])
   await page.screenshot({ path: '/tmp/ourlingo-unit-2-review-phone.png' })
-  await page.getByRole('button', { name: 'Save & approve' }).click()
+  await page.getByRole('button', { name: 'Save vocabulary' }).click()
   await page.getByRole('button', { name: 'Kid space', exact: true }).click()
   await page
     .getByRole('button', { name: 'Practise MORE! 1 Unit 2', exact: true })
@@ -558,6 +581,86 @@ for (const state of ['edited', 'empty'] as const) {
   })
 }
 
+test('previously installed bundled units are approved on upgrade', async ({
+  page,
+}) => {
+  const allUnits = [unit, unitTwo, ...moreTwoFixtures]
+  await page.addInitScript((units) => {
+    localStorage.setItem(
+      'ourlingo.library.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        units: units.map((item) => ({ ...item, reviewStatus: 'pending' })),
+        bundledUnitKeys: units.map((item) => `${item.book}:${item.unit}`),
+      }),
+    )
+  }, allUnits)
+  await page.goto('/')
+  await expect(page.locator('.unit-card')).toHaveCount(5)
+  for (const bundled of allUnits) {
+    await expect(
+      page.getByRole('button', {
+        name: `Practise ${bundled.book} Unit ${bundled.unit}`,
+        exact: true,
+      }),
+    ).toBeEnabled()
+  }
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
+  )
+  expect(saved.units.every((item: VocabularyUnit) => item.reviewStatus === 'approved')).toBe(true)
+})
+
+test('parent learning report marks a word known after three correct rounds', async ({
+  page,
+}) => {
+  const singleWordUnit = {
+    ...unit,
+    reviewStatus: 'approved' as const,
+    entries: [{ english: 'picture', german: 'Bild', example: null }],
+  }
+  await page.addInitScript((data) => {
+    localStorage.setItem(
+      'ourlingo.more-1-unit-1.v1',
+      JSON.stringify(data),
+    )
+  }, singleWordUnit)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  for (let round = 1; round <= 3; round++) {
+    if (round === 1)
+      await page.getByRole('button', { name: 'Start practice' }).click()
+    else await page.getByRole('button', { name: 'Another round' }).click()
+    await expect(page.locator('.question-word')).toHaveText('Bild')
+    await page.getByLabel('In English', { exact: true }).fill('picture')
+    await page.getByRole('button', { name: 'Check answer' }).click()
+    await expect(page.getByRole('status')).toContainText("That's right!")
+    await page.getByRole('button', { name: 'See results' }).click()
+  }
+  const savedProgress = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('ourlingo.learning.v1')!),
+  )
+  expect(savedProgress.records[0].correctStreak).toBe(3)
+  await page.reload()
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Learning report', exact: true }).click()
+  const report = page.getByRole('region', {
+    name: 'MORE! 1 Unit 1 progress',
+  })
+  await expect(report.getByText('Known (1)', { exact: true })).toBeVisible()
+  await expect(report.getByText('Still learning (0)', { exact: true })).toBeVisible()
+  await report.getByText('Known (1)', { exact: true }).click()
+  await expect(report.getByText('picture', { exact: true })).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+})
+
 test('an unavailable Unit 2 download leaves saved Unit 1 available', async ({
   page,
 }) => {
@@ -596,7 +699,7 @@ for (const fixture of moreTwoFixtures) {
         name: `Practise MORE! 2 Unit ${fixture.unit}`,
         exact: true,
       }),
-    ).toBeDisabled()
+    ).toBeEnabled()
     await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
     await expect(page.locator('.unit-card')).toHaveCount(3)
     await page
@@ -645,7 +748,11 @@ for (const fixture of moreTwoFixtures) {
         page.getByText('Parent translation', { exact: true }),
       ).toHaveCount(1)
     }
-    await page.getByRole('button', { name: 'Save & approve' }).click()
+    await page
+      .getByRole('button', {
+        name: wordFileIndex >= 0 ? 'Save & approve' : 'Save vocabulary',
+      })
+      .click()
     const active: VocabularyUnit = await page.evaluate(
       (number) =>
         JSON.parse(localStorage.getItem('ourlingo.library.v1')!).units.find(
@@ -745,7 +852,6 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
   page,
 }) => {
   await openReview(page)
-  await page.getByRole('button', { name: 'Save & approve' }).click()
   await page.getByRole('button', { name: 'Practice', exact: true }).click()
   await page.getByText('Matching pairs', { exact: true }).click()
   await expect(page.getByLabel('Words per round')).toHaveCount(0)
@@ -788,7 +894,7 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
   await expect(page.locator('.matching-tile.incorrect')).toHaveCount(2)
   await expect(page.locator('.matching-tile:disabled')).toHaveCount(0)
   await expect(
-    page.getByRole('button', { name: 'See results', exact: true }),
+    page.getByRole('button', { name: 'Next pass', exact: true }),
   ).toBeDisabled()
   expect(
     await englishGroup
@@ -827,8 +933,15 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
       .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
       .click()
   }
-  await expect(page.getByRole('status')).toContainText('All pairs matched!')
+  await expect(page.getByRole('status')).toContainText('Pass complete')
   await expect(page.locator('.matching-tile:disabled')).toHaveCount(10)
+  for (const pass of [2, 3]) {
+    await page.getByRole('button', { name: 'Next pass', exact: true }).click()
+    await expect(
+      page.getByText(`Matching pairs - Pass ${pass} of 3`, { exact: true }),
+    ).toBeVisible()
+    await completeMatchingPass(page, unit.entries)
+  }
   await page.getByRole('button', { name: 'See results', exact: true }).click()
   await expect(page.locator('.score')).toHaveText('4 / 5')
   await expect(
@@ -845,14 +958,10 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
     .locator('.matching-tile > span:first-child')
     .allTextContents()
   expect(retryWords).toHaveLength(5)
-  for (const text of retryWords) {
-    const entry = unit.entries.find((item) => item.english === text)!
-    await page
-      .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
-      .click()
-    await page
-      .getByRole('button', { name: `English: ${entry.english}`, exact: true })
-      .click()
+  for (const pass of [1, 2, 3]) {
+    if (pass > 1)
+      await page.getByRole('button', { name: 'Next pass', exact: true }).click()
+    await completeMatchingPass(page, unit.entries)
   }
   await page.getByRole('button', { name: 'See results', exact: true }).click()
   await expect(page.locator('.score')).toHaveText('5 / 5')
@@ -893,6 +1002,11 @@ test('small matching units use fewer pairs and ambiguous translations do not app
     await page
       .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
       .click()
+  }
+  await expect(page.getByRole('status')).toContainText('Pass complete')
+  for (let pass = 2; pass <= 3; pass++) {
+    await page.getByRole('button', { name: 'Next pass', exact: true }).click()
+    await completeMatchingPass(page, pairs)
   }
   await page.getByRole('button', { name: 'See results', exact: true }).click()
   await expect(page.locator('.score')).toHaveText('2 / 2')
@@ -1030,7 +1144,7 @@ for (const width of [1440, 768, 390, 320]) {
           .evaluate((image) => (image as HTMLImageElement).naturalWidth),
       ).toBeGreaterThan(0)
     await page.screenshot({ path: `/tmp/ourlingo-review-${width}.png` })
-    await page.getByRole('button', { name: 'Save & approve' }).click()
+    await page.getByRole('button', { name: 'Save vocabulary' }).click()
     await page.getByRole('button', { name: 'Practice', exact: true }).click()
     await page.getByRole('button', { name: 'Start practice' }).click()
     await expect(page.getByLabel('In English', { exact: true })).toBeVisible()
@@ -1101,3 +1215,29 @@ for (const width of [1440, 768, 390, 320]) {
     await page.screenshot({ path: `/tmp/ourlingo-matching-${width}.png` })
   })
 }
+
+test('follows the system dark theme without clipping the phone layout', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await expect(
+    page.getByRole('region', { name: 'Kid space', exact: true }),
+  ).toBeVisible()
+  const colors = await page.evaluate(() => ({
+    scheme: getComputedStyle(document.documentElement).colorScheme,
+    page: getComputedStyle(document.documentElement).backgroundColor,
+    card: getComputedStyle(document.querySelector('.unit-card')!).backgroundColor,
+    text: getComputedStyle(document.querySelector('.unit-card h2')!).color,
+  }))
+  expect(colors.scheme).toContain('dark')
+  expect(colors.page).toBe('rgb(20, 26, 22)')
+  expect(colors.card).toBe('rgb(29, 41, 35)')
+  expect(colors.text).toBe('rgb(227, 236, 230)')
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+})

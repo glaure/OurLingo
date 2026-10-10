@@ -19,6 +19,7 @@ export interface VocabularyUnit {
 export const storageKey = 'ourlingo.more-1-unit-1.v1'
 export const libraryStorageKey = 'ourlingo.library.v1'
 export const bundledUnitFiles = [
+  { book: 'MORE! 1', unit: 1, file: 'more-1-unit-1.json' },
   { book: 'MORE! 1', unit: 2, file: 'more-1-unit-2.json' },
   { book: 'MORE! 2', unit: 1, file: 'more-2-unit-1.json' },
   { book: 'MORE! 2', unit: 2, file: 'more-2-unit-2.json' },
@@ -31,8 +32,92 @@ export interface VocabularyLibrary {
   bundledUnitKeys?: string[]
 }
 
+export interface LearningProgressRecord {
+  book: VocabularyUnit['book']
+  unit: number
+  english: string
+  german: string
+  correctAttempts: number
+  incorrectAttempts: number
+  correctStreak: number
+  lastPracticedAt: string
+}
+
+export interface LearningProgress {
+  schemaVersion: 1
+  records: LearningProgressRecord[]
+}
+
+export interface PracticeAttempt {
+  english: string
+  german: string
+  correct: boolean
+}
+
 export function unitKey(unit: Pick<VocabularyUnit, 'book' | 'unit'>): string {
   return `${unit.book}:${unit.unit}`
+}
+
+export const learningProgressStorageKey = 'ourlingo.learning.v1'
+
+export function isLearningProgress(value: unknown): value is LearningProgress {
+  if (!value || typeof value !== 'object') return false
+  const progress = value as Partial<LearningProgress>
+  return (
+    progress.schemaVersion === 1 &&
+    Array.isArray(progress.records) &&
+    progress.records.every((record) => {
+      if (!record || typeof record !== 'object') return false
+      const item = record as Partial<LearningProgressRecord>
+      return (
+        (item.book === 'MORE! 1' || item.book === 'MORE! 2') &&
+        Number.isInteger(item.unit) &&
+        Number(item.unit) > 0 &&
+        typeof item.english === 'string' &&
+        typeof item.german === 'string' &&
+        Number.isInteger(item.correctAttempts) &&
+        Number(item.correctAttempts) >= 0 &&
+        Number.isInteger(item.incorrectAttempts) &&
+        Number(item.incorrectAttempts) >= 0 &&
+        Number.isInteger(item.correctStreak) &&
+        Number(item.correctStreak) >= 0 &&
+        typeof item.lastPracticedAt === 'string'
+      )
+    })
+  )
+}
+
+export function updateLearningProgress(
+  progress: LearningProgress,
+  unit: Pick<VocabularyUnit, 'book' | 'unit'>,
+  attempts: PracticeAttempt[],
+  lastPracticedAt: string,
+): LearningProgress {
+  const records = [...progress.records]
+  for (const attempt of attempts) {
+    const index = records.findIndex(
+      (record) =>
+        record.book === unit.book &&
+        record.unit === unit.unit &&
+        record.english === attempt.english,
+    )
+    const previous = index === -1 ? null : records[index]
+    const record: LearningProgressRecord = {
+      book: unit.book,
+      unit: unit.unit,
+      english: attempt.english,
+      german: attempt.german,
+      correctAttempts:
+        (previous?.correctAttempts ?? 0) + Number(attempt.correct),
+      incorrectAttempts:
+        (previous?.incorrectAttempts ?? 0) + Number(!attempt.correct),
+      correctStreak: attempt.correct ? (previous?.correctStreak ?? 0) + 1 : 0,
+      lastPracticedAt,
+    }
+    if (index === -1) records.push(record)
+    else records[index] = record
+  }
+  return { schemaVersion: 1, records }
 }
 
 export function isVocabularyLibrary(
@@ -89,11 +174,16 @@ export function mergeBundledUnits(
   }
   for (const unit of bundled) {
     const key = unitKey(unit)
-    if (installed.has(key)) continue
     const existing = merged.units.find((item) => unitKey(item) === key)
-    if (!existing) merged = upsertUnit(merged, unit)
+    const approvedUnit = { ...unit, reviewStatus: 'approved' as const }
+    if (installed.has(key)) {
+      if (existing && existing.reviewStatus !== 'approved')
+        merged = upsertUnit(merged, { ...existing, reviewStatus: 'approved' })
+      continue
+    }
+    if (!existing) merged = upsertUnit(merged, approvedUnit)
     else if (existing.reviewStatus === 'pending' && !existing.entries.length) {
-      merged = upsertUnit(merged, { ...unit, title: existing.title })
+      merged = upsertUnit(merged, { ...approvedUnit, title: existing.title })
     }
     installed.add(key)
   }
