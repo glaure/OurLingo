@@ -2,6 +2,8 @@
 
 A family vocabulary learning app with MORE! 1, Units 1-2, and MORE! 2, Units 1-3.
 
+For the Windows workspace transition and proposed Tauri v2 packaging work, see [Development Handoff](DEVELOPMENT-HANDOFF.md).
+
 ## Current Features
 
 - Open in kid space by default, with a unit library and practice for approved units only.
