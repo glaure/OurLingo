@@ -8,7 +8,9 @@ OurLingo is a vocabulary learning app for the user's daughters, accompanying MOR
 
 The user wants installed Windows and Android apps and has chosen to investigate Tauri v2. Tauri v2 can package the existing React interface for Windows, Android, macOS, Linux and iOS. Start with Android, then Windows, retaining the browser version.
 
-No Tauri integration, Rust source, native project, installer, APK, signing configuration or native storage exists yet. We checked prerequisites but did not install them. Recheck the Windows machine before installing anything: the user may have installed tools since this note was written.
+Tauri v2 is now integrated into the existing Vite app. The Tauri CLI, Vite configuration, Rust project and generated Android project are present. An arm64 debug APK builds and installs in the Android 37 emulator; the app loads all five bundled units with emulator networking disabled, review/approval works in the emulator's separate local storage, and typed practice accepts a correct answer offline. Multiple-choice and matching practice, a physical-device test, full-library backup/restore and Windows desktop build remain outstanding.
+
+The current Windows machine has Node.js 24.21.0, npm 11.19.0, Rust 1.99.0 with the MSVC toolchain, Android Studio's JDK 25, Android SDK Platforms 36 and 37, Build-Tools 36.0.0, Command-line Tools 23.0, NDK 30.0.16248370, Visual Studio Build Tools 2022 and WebView2. Windows Developer Mode is enabled for Android build symlinks. Recheck tools and environment variables if moving to another machine.
 
 Android development could remain in WSL, but the user prefers a separate Windows clone to avoid extra device/emulator integration and prepare for Windows builds. Do not share node_modules or build artifacts between Windows and WSL checkouts. Exchange changes through Git.
 
@@ -96,14 +98,14 @@ Before migrating real data, provide and test an import/restore path. Existing JS
 
 ## Tauri Packaging Considerations
 
-Suggested sequence, not yet implemented:
+Setup progress and remaining work:
 
-1. Verify the Windows toolchain and browser app baseline.
-2. Add Tauri v2 to this existing project, using Vite for development and dist for bundled frontend assets.
-3. Initialise Android support and produce a debug APK for device testing.
-4. Verify all five datasets load from packaged assets without the development server and all practice modes work offline.
-5. Provide safe vocabulary backup/import and decide on native data persistence deliberately.
-6. Build the Windows app using the Windows toolchain, then address release signing and distribution separately.
+1. Windows prerequisites and the browser baseline are verified; build, lint, 18 unit tests and 27 browser tests pass.
+2. Tauri v2 is configured to use Vite and `dist`; Android support is initialized. `npm run tauri` is required by generated Gradle tasks.
+3. The arm64 debug APK builds at `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk` and launches in the API 37 emulator.
+4. The offline library, review/approval and a correct typed-practice answer are smoke-tested. Verify multiple-choice and matching modes offline and test a physical device.
+5. Provide and test full-library backup/restore, then decide on native data persistence deliberately. Browser and native WebView storage are separate.
+6. Build and test the Windows app using the installed Windows toolchain, then address release signing and distribution separately.
 
 Prefer current official Tauri documentation and minimal permissions; do not add native plugins or capabilities without a concrete need. Do not commit signing keys, passwords or machine-specific SDK paths.
 

@@ -36,6 +36,120 @@ The development server has no authentication. Use it only on a trusted local net
 
 The kid/parent switch separates learning from editing but has no password or PIN. Parent space is accessible to anyone using the browser. Every page reload returns to kid space.
 
+## Windows Native Setup (Android First)
+
+Use a native Windows PowerShell terminal in this checkout, not a WSL terminal. Do not share `node_modules` or build output with a WSL checkout. Tauri packages this existing React app; it does not replace the browser version or alter the bundled vocabulary files.
+
+### 1. Check Existing Tools
+
+In PowerShell, check which tools are already available:
+
+```powershell
+Get-Command git,node,npm,rustup,rustc,cargo,java,adb -ErrorAction SilentlyContinue
+```
+
+Git is required. Vite 8 requires Node.js 20.19+ or 22.12+; install a currently supported Node.js LTS release, which includes npm. Rust must use the Windows MSVC toolchain. Android development also needs a JDK and the Android SDK/NDK. On the Windows machine used to prepare this guide, Visual Studio Build Tools 2022 (including MSVC and a Windows SDK) and the WebView2 Runtime are already installed; check before reinstalling them.
+
+### 2. Install Node.js LTS
+
+1. Download the Windows installer for the current LTS release from [nodejs.org](https://nodejs.org/en/download).
+2. Run the installer interactively with its default options, including npm. Approve any Windows permission prompt yourself.
+3. Close and reopen PowerShell, then verify:
+
+```powershell
+node --version
+npm --version
+```
+
+### 3. Install Rust for Windows
+
+1. Install Rust using the official [rustup instructions](https://www.rust-lang.org/tools/install) for Windows.
+2. Select the stable `x86_64-pc-windows-msvc` toolchain when prompted. Do not choose the GNU toolchain.
+3. Close and reopen PowerShell, then verify:
+
+```powershell
+rustup show active-toolchain
+rustc --version
+cargo --version
+```
+
+The active toolchain should include `stable-x86_64-pc-windows-msvc`.
+
+### 4. Install Android Studio and SDK Packages
+
+1. Download and install [Android Studio](https://developer.android.com/studio). Complete its first-run setup interactively and allow it to install the Android SDK.
+2. Open **Tools > SDK Manager**. Install an Android SDK Platform, **Android SDK Platform-Tools**, **Android SDK Build-Tools**, **Android SDK Command-line Tools (latest)**, and **NDK (Side by side)**.
+3. Do not guess or pin SDK/NDK versions at this stage. After Tauri's Android project is initialized, install the versions required by its generated Gradle configuration if they differ from the installed defaults.
+4. In SDK Manager, note the **Android SDK Location**. In Android Studio's installation directory, locate its bundled `jbr` folder (the JDK).
+
+### 5. Set Android Environment Variables
+
+In Windows, search for **Edit environment variables for your account** and add these as user variables:
+
+- `JAVA_HOME`: the Android Studio `jbr` directory, not its `bin` subdirectory.
+- `ANDROID_HOME`: the Android SDK Location shown in SDK Manager.
+- `NDK_HOME`: the installed NDK directory under `<ANDROID_HOME>\ndk\<version>`.
+
+Use the actual paths on this machine; do not paste the example variable names as literal path values. Close and reopen PowerShell after changing environment variables. `ANDROID_SDK_ROOT` is not needed when using `ANDROID_HOME`.
+
+### 6. Add Rust Android Targets
+
+Run this in PowerShell after Rustup is available:
+
+```powershell
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+```
+
+### 7. Enable Windows Developer Mode
+
+Tauri's Android build creates symbolic links for native libraries. On Windows, enable **Developer Mode** in **Settings > System > For developers** before building. You can open that Settings page with:
+
+```powershell
+Start-Process 'ms-settings:developers'
+```
+
+Turn on **Developer Mode**, then reopen PowerShell. If your organization manages this setting and prevents enabling it, ask your administrator; do not change the system security policy yourself.
+
+### 8. Verify Prerequisites and the Browser App
+
+Confirm the tools and paths are visible in a newly opened PowerShell window:
+
+```powershell
+node --version
+npm --version
+rustup show active-toolchain
+rustup target list --installed
+& "$env:JAVA_HOME\bin\java.exe" -version
+& "$env:ANDROID_HOME\platform-tools\adb.exe" version
+Test-Path "$env:ANDROID_HOME\platform-tools\adb.exe"
+Test-Path $env:NDK_HOME
+```
+
+Both `Test-Path` commands should return `True`. Verify the existing browser app before building the native app:
+
+```powershell
+npm ci
+npm run build
+npm run lint
+npm test
+npx playwright install chromium
+npm run test:e2e -- --workers=2
+```
+
+Keep using `npm run dev` for the browser version. This checkout now includes the Tauri v2 CLI, Vite integration and generated Android project. Build an arm64 debug APK from the repository root:
+
+```powershell
+npx tauri android build --debug --apk --target aarch64
+```
+
+The first build may download Gradle and any Android SDK Platform required by the generated project. The APK is written to `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`. To install it on a connected Android device with USB debugging enabled, run:
+
+```powershell
+& "$env:ANDROID_HOME\platform-tools\adb.exe" install -r src-tauri\gen\android\app\build\outputs\apk\universal\debug\app-universal-debug.apk
+```
+
+Use `adb devices -l` to confirm a device is connected. Test the packaged app with Wi-Fi and mobile data disabled to verify bundled units load offline. The Android WebView has separate localStorage from the browser, and there is no library import/restore yet; use test data in the native app until a full-library backup and restore path exists. Windows desktop packaging can follow later; this machine already has the documented C++ Build Tools and WebView2 prerequisites. See the [official Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) if a toolchain update is needed.
+
 ## Data and Limitations
 
 The bundled datasets under `public/data/` cover MORE! 1, Units 1-2, and MORE! 2, Units 1-3. They are manual transcriptions of user-provided photos, not automated OCR results. All new units remain pending until approved in the app.
