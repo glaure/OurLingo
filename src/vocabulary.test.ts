@@ -34,6 +34,17 @@ const unitTwo: unknown = JSON.parse(
 )
 assert.ok(isVocabularyUnit(unitTwo))
 
+const moreOneNewUnits = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((number) => {
+  const data: unknown = JSON.parse(
+    readFileSync(
+      new URL(`../public/data/more-1-unit-${number}.json`, import.meta.url),
+      'utf8',
+    ),
+  )
+  assert.ok(isVocabularyUnit(data))
+  return data
+})
+
 test('Unit 2 transcription has 41 entries, 37 examples, and the correct book and review status', () => {
   assert.equal(unitTwo.book, 'MORE! 1')
   assert.equal(unitTwo.unit, 2)
@@ -114,7 +125,7 @@ test('empty drafts get the transcription but populated Unit 2 is never overwritt
   assert.equal(isVocabularyLibrary({ ...kept, bundledUnitKeys: [null] }), false)
 })
 
-const moreTwoUnits = [1, 2, 3].map((number) => {
+const moreTwoUnits = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((number) => {
   const data: unknown = JSON.parse(
     readFileSync(
       new URL(`../public/data/more-2-unit-${number}.json`, import.meta.url),
@@ -126,7 +137,7 @@ const moreTwoUnits = [1, 2, 3].map((number) => {
 })
 
 test('bundled units are approved without overwriting edits, drafts, or deletions', () => {
-  const bundledUnits = [unit, unitTwo, ...moreTwoUnits]
+  const bundledUnits = [unit, unitTwo, ...moreOneNewUnits, ...moreTwoUnits]
   const editedUnit = {
     ...unit,
     reviewStatus: 'pending' as const,
@@ -134,7 +145,7 @@ test('bundled units are approved without overwriting edits, drafts, or deletions
   }
   const parentDraft = {
     ...unit,
-    unit: 9,
+    unit: 16,
     title: 'Parent draft',
     reviewStatus: 'pending' as const,
     entries: [unit.entries[0]],
@@ -164,7 +175,7 @@ test('bundled units are approved without overwriting edits, drafts, or deletions
     'geben; aushändigen',
   )
   assert.equal(
-    approved.units.find((candidate) => candidate.unit === 9)?.reviewStatus,
+    approved.units.find((candidate) => candidate.unit === 16)?.reviewStatus,
     'pending',
   )
 
@@ -186,6 +197,18 @@ test('MORE! 2 photo transcriptions preserve table examples and mark suggested Wo
     [45, 34, 11],
     [39, 39, 0],
     [33, 27, 6],
+    [35, 35, 0],
+    [37, 28, 9],
+    [35, 25, 10],
+    [30, 21, 8],
+    [33, 26, 7],
+    [31, 26, 5],
+    [26, 22, 4],
+    [29, 23, 6],
+    [33, 24, 8],
+    [33, 32, 0],
+    [38, 25, 13],
+    [24, 14, 10],
   ]
   for (const [index, data] of moreTwoUnits.entries()) {
     assert.equal(data.book, 'MORE! 2')
@@ -214,6 +237,45 @@ test('MORE! 2 photo transcriptions preserve table examples and mark suggested Wo
         assert.equal(choices.filter((choice) => choice.correct).length, 1)
       }
     }
+  }
+})
+
+test('MORE! 1 Units 3-15 photo transcriptions preserve visible examples and suggested illustrated translations', () => {
+  const counts = [
+    [31, 24, 5],
+    [42, 32, 0],
+    [43, 31, 8],
+    [38, 33, 0],
+    [28, 23, 2],
+    [27, 14, 12],
+    [40, 36, 4],
+    [44, 24, 10],
+    [38, 30, 0],
+    [65, 30, 27],
+    [41, 39, 0],
+    [44, 44, 0],
+    [23, 14, 9],
+  ]
+  for (const [index, data] of moreOneNewUnits.entries()) {
+    assert.equal(data.book, 'MORE! 1')
+    assert.equal(data.unit, index + 3)
+    assert.equal(data.reviewStatus, 'approved')
+    assert.equal(data.entries.length, counts[index][0])
+    assert.equal(
+      data.entries.filter((entry) => entry.example).length,
+      counts[index][1],
+    )
+    const wordFile = data.entries.filter(
+      (entry) => entry.origin === 'word-file',
+    )
+    assert.equal(wordFile.length, counts[index][2])
+    assert.ok(
+      wordFile.every(
+        (entry) =>
+          entry.translationSource === 'suggested' && entry.example === null,
+      ),
+    )
+    assert.equal(validateEntries(data.entries), null)
   }
 })
 

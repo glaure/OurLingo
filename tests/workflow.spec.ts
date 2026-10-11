@@ -11,10 +11,17 @@ const unitTwo = JSON.parse(
   readFileSync('public/data/more-1-unit-2.json', 'utf8'),
 ) as VocabularyUnit
 
-const moreTwoFixtures = [1, 2, 3].map(
+const moreTwoFixtures = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(
   (number) =>
     JSON.parse(
       readFileSync(`public/data/more-2-unit-${number}.json`, 'utf8'),
+    ) as VocabularyUnit,
+)
+
+const moreOneFixtures = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(
+  (number) =>
+    JSON.parse(
+      readFileSync(`public/data/more-1-unit-${number}.json`, 'utf8'),
     ) as VocabularyUnit,
 )
 
@@ -56,7 +63,7 @@ test('review, search, edit, approve and reload saved vocabulary', async ({
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await openReview(page)
-  await expect(page.getByText('v0.1.0', { exact: true })).toBeVisible()
+  await expect(page.getByText('v0.1.1', { exact: true })).toBeVisible()
   await expect(page.locator('.vocabulary-row')).toHaveCount(42)
   await expect(
     page.getByRole('button', { name: 'Practice', exact: true }),
@@ -292,7 +299,7 @@ test('kid space is the default, migration preserves approved edits, and parent c
   const migrated = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(migrated.units).toHaveLength(5)
+  expect(migrated.units).toHaveLength(30)
   expect(migrated.units[0].entries[0].german).toBe('geben; schenken')
   expect(migrated.units[0].reviewStatus).toBe('approved')
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
@@ -310,7 +317,7 @@ test('create units in both books, keep their words separate, and practise the se
   for (const data of [
     {
       book: 'MORE! 1',
-      number: '3',
+      number: '16',
       title: 'At school',
       words: [
         { english: 'book', german: 'Buch' },
@@ -319,7 +326,7 @@ test('create units in both books, keep their words separate, and practise the se
     },
     {
       book: 'MORE! 2',
-      number: '4',
+      number: '16',
       title: 'Feelings',
       words: [
         { english: 'happy', german: 'glücklich' },
@@ -349,12 +356,12 @@ test('create units in both books, keep their words separate, and practise the se
     await expect(page.getByRole('status')).toContainText('approved and saved')
   }
   await page.getByRole('button', { name: 'Kid space', exact: true }).click()
-  await expect(page.locator('.unit-card')).toHaveCount(7)
+  await expect(page.locator('.unit-card')).toHaveCount(32)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
   await page
-    .getByRole('button', { name: 'Practise MORE! 1 Unit 3', exact: true })
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 16', exact: true })
     .click()
   await page.getByText('Multiple choice', { exact: true }).click()
   await page.getByRole('button', { name: 'Start practice' }).click()
@@ -364,7 +371,7 @@ test('create units in both books, keep their words separate, and practise the se
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'My units', exact: false }).click()
   await page
-    .getByRole('button', { name: 'Practise MORE! 2 Unit 4', exact: true })
+    .getByRole('button', { name: 'Practise MORE! 2 Unit 16', exact: true })
     .click()
   await page.getByRole('button', { name: 'Start practice' }).click()
   expect(
@@ -373,7 +380,7 @@ test('create units in both books, keep their words separate, and practise the se
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(stored.units).toHaveLength(7)
+  expect(stored.units).toHaveLength(32)
   expect(
     stored.units.find(
       (item: VocabularyUnit) => item.book === 'MORE! 1' && item.unit === 1,
@@ -383,12 +390,12 @@ test('create units in both books, keep their words separate, and practise the se
   await expect(
     page.getByRole('region', { name: 'Kid space', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('.unit-card')).toHaveCount(7)
+  await expect(page.locator('.unit-card')).toHaveCount(32)
   await expect(
-    page.getByRole('button', { name: 'Practise MORE! 2 Unit 4', exact: true }),
+    page.getByRole('button', { name: 'Practise MORE! 2 Unit 16', exact: true }),
   ).toBeEnabled()
   await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
-  await expect(page.locator('.unit-card')).toHaveCount(4)
+  await expect(page.locator('.unit-card')).toHaveCount(16)
 })
 
 test('duplicate units cannot overwrite data and unsaved review changes require confirmation', async ({
@@ -400,8 +407,8 @@ test('duplicate units cannot overwrite data and unsaved review changes require c
   await page.getByLabel('Unit number', { exact: true }).fill('1')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('already exists')
-  await expect(page.locator('.unit-card')).toHaveCount(5)
-  await page.getByLabel('Unit number', { exact: true }).fill('3')
+  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await page.getByLabel('Unit number', { exact: true }).fill('16')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await page.getByRole('button', { name: 'Add a word or phrase' }).click()
   await page.getByLabel('English entry 1', { exact: true }).fill('hello')
@@ -413,12 +420,12 @@ test('duplicate units cannot overwrite data and unsaved review changes require c
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Kid space', exact: true }).click()
   await expect(
-    page.getByRole('button', { name: 'Practise MORE! 1 Unit 3', exact: true }),
+    page.getByRole('button', { name: 'Practise MORE! 1 Unit 16', exact: true }),
   ).toBeDisabled()
   await page.reload()
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await page
-    .getByRole('button', { name: 'Review MORE! 1 Unit 3', exact: true })
+    .getByRole('button', { name: 'Review MORE! 1 Unit 16', exact: true })
     .click()
   await expect(page.locator('.vocabulary-row')).toHaveCount(0)
 })
@@ -432,13 +439,38 @@ test('confirmed unit deletion persists and an empty library does not restore del
   await page
     .getByRole('button', { name: 'Delete MORE! 1 Unit 1', exact: true })
     .click()
-  await expect(page.locator('.unit-card')).toHaveCount(5)
+  await expect(page.locator('.unit-card')).toHaveCount(30)
   for (const name of [
     'MORE! 1 Unit 1',
     'MORE! 1 Unit 2',
+    'MORE! 1 Unit 3',
+    'MORE! 1 Unit 4',
+    'MORE! 1 Unit 5',
+    'MORE! 1 Unit 6',
+    'MORE! 1 Unit 7',
+    'MORE! 1 Unit 8',
+    'MORE! 1 Unit 9',
+    'MORE! 1 Unit 10',
+    'MORE! 1 Unit 11',
+    'MORE! 1 Unit 12',
+    'MORE! 1 Unit 13',
+    'MORE! 1 Unit 14',
+    'MORE! 1 Unit 15',
     'MORE! 2 Unit 1',
     'MORE! 2 Unit 2',
     'MORE! 2 Unit 3',
+    'MORE! 2 Unit 4',
+    'MORE! 2 Unit 5',
+    'MORE! 2 Unit 6',
+    'MORE! 2 Unit 7',
+    'MORE! 2 Unit 8',
+    'MORE! 2 Unit 9',
+    'MORE! 2 Unit 10',
+    'MORE! 2 Unit 11',
+    'MORE! 2 Unit 12',
+    'MORE! 2 Unit 13',
+    'MORE! 2 Unit 14',
+    'MORE! 2 Unit 15',
   ]) {
     page.once('dialog', (dialog) => dialog.accept())
     await page
@@ -584,7 +616,7 @@ for (const state of ['edited', 'empty'] as const) {
 test('previously installed bundled units are approved on upgrade', async ({
   page,
 }) => {
-  const allUnits = [unit, unitTwo, ...moreTwoFixtures]
+  const allUnits = [unit, unitTwo, ...moreOneFixtures, ...moreTwoFixtures]
   await page.addInitScript((units) => {
     localStorage.setItem(
       'ourlingo.library.v1',
@@ -596,7 +628,7 @@ test('previously installed bundled units are approved on upgrade', async ({
     )
   }, allUnits)
   await page.goto('/')
-  await expect(page.locator('.unit-card')).toHaveCount(5)
+  await expect(page.locator('.unit-card')).toHaveCount(30)
   for (const bundled of allUnits) {
     await expect(
       page.getByRole('button', {
@@ -682,8 +714,86 @@ test('an unavailable Unit 2 download leaves saved Unit 1 available', async ({
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(4)
+  await expect(page.locator('.unit-card')).toHaveCount(29)
 })
+
+for (const fixture of moreOneFixtures) {
+  test(`MORE! 1 Unit ${fixture.unit} supports phone review and translation provenance`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 900 })
+    await page.goto('/')
+    await expect(
+      page.getByRole('button', {
+        name: `Practise MORE! 1 Unit ${fixture.unit}`,
+        exact: true,
+      }),
+    ).toBeEnabled()
+    await page.getByRole('radio', { name: 'MORE! 1', exact: true }).check()
+    await expect(page.locator('.unit-card')).toHaveCount(15)
+    await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+    await page
+      .getByRole('button', {
+        name: `Review MORE! 1 Unit ${fixture.unit}`,
+        exact: true,
+      })
+      .click()
+    await expect(page.locator('.vocabulary-row')).toHaveCount(
+      fixture.entries.length,
+    )
+    const suggestedIndex = fixture.entries.findIndex(
+      (entry) => entry.origin === 'word-file',
+    )
+    const suggested = fixture.entries.filter(
+      (entry) => entry.origin === 'word-file',
+    ).length
+    await expect(
+      page.getByText('Suggested translation', { exact: true }),
+    ).toHaveCount(suggested)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true)
+    if (suggestedIndex >= 0) {
+      await page
+        .getByLabel(`German entry ${suggestedIndex + 1}`, { exact: true })
+        .fill(fixture.entries[suggestedIndex].german.toUpperCase())
+      await expect(
+        page.getByText('Parent translation', { exact: true }),
+      ).toHaveCount(1)
+    }
+    await page
+      .getByRole('button', {
+        name: suggested ? 'Save & approve' : 'Save vocabulary',
+      })
+      .click()
+    const saved: VocabularyUnit = await page.evaluate(
+      (number) =>
+        JSON.parse(localStorage.getItem('ourlingo.library.v1')!).units.find(
+          (item: VocabularyUnit) =>
+            item.book === 'MORE! 1' && item.unit === number,
+        ),
+      fixture.unit,
+    )
+    expect(saved.entries).toHaveLength(fixture.entries.length)
+    expect(saved.entries.filter((entry) => entry.origin === 'word-file')).toHaveLength(
+      suggested,
+    )
+    if (suggestedIndex >= 0)
+      expect(saved.entries[suggestedIndex].translationSource).toBe('parent')
+    await page.getByRole('button', { name: 'Kid space', exact: true }).click()
+    await page
+      .getByRole('button', {
+        name: `Practise MORE! 1 Unit ${fixture.unit}`,
+        exact: true,
+      })
+      .click()
+    await page.getByText('Type answer', { exact: true }).click()
+    await page.getByRole('button', { name: 'Start practice' }).click()
+    await expect(page.locator('.question-word')).toBeVisible()
+  })
+}
 
 for (const fixture of moreTwoFixtures) {
   test(`MORE! 2 Unit ${fixture.unit} supports phone review, translation provenance and practice`, async ({
@@ -701,7 +811,7 @@ for (const fixture of moreTwoFixtures) {
       }),
     ).toBeEnabled()
     await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
-    await expect(page.locator('.unit-card')).toHaveCount(3)
+    await expect(page.locator('.unit-card')).toHaveCount(15)
     await page
       .getByRole('button', { name: 'Parent space', exact: true })
       .click()
@@ -837,7 +947,7 @@ test('MORE! 2 additions preserve edited vocabulary and approval in an existing l
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(5)
+  await expect(page.locator('.unit-card')).toHaveCount(30)
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await page
     .getByRole('button', { name: 'Review MORE! 2 Unit 1', exact: true })

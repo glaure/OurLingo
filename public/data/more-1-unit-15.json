@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "book": "MORE! 1",
+  "unit": 15,
+  "title": "Holiday activities",
+  "source": "User-provided cropped workbook photo, partial table transcription; illustrated holiday translations suggested separately",
+  "reviewStatus": "approved",
+  "entries": [
+    { "english": "aunt", "german": "Tante", "example": "My aunt is my mum's sister." },
+    { "english": "beach", "german": "Strand", "example": "Let's go to the beach and swim in the sea." },
+    { "english": "board game", "german": "Brettspiel", "example": "In the evening, we're going to play board games." },
+    { "english": "campsite", "german": "Campingplatz", "example": "We're going to stay at a campsite and sleep in a tent." },
+    { "english": "cook", "german": "Koch/Köchin", "example": "My grandma is a very good cook." },
+    { "english": "to drive", "german": "fahren; Fahrt", "example": "We're going to drive to Grandma's house. It's a long drive." },
+    { "english": "holiday", "german": "Urlaub; Ferien", "example": "My mum and dad have no holiday." },
+    { "english": "national park", "german": "Nationalpark", "example": "We're going to visit the national parks in the United States." },
+    { "english": "parents", "german": "Eltern", "example": "My parents and I are going to fly to the US." },
+    { "english": "plane", "german": "Flugzeug", "example": "I'm not scared of flying. I can sleep on the plane most of the time." },
+    { "english": "summer", "german": "Sommer", "example": "In the summer, I'm going to go swimming." },
+    { "english": "hippo", "german": "Nilpferd", "example": "Hippos are big animals." },
+    { "english": "to join", "german": "beitreten, ein Mitglied werden", "example": "Let's join an Irish band." },
+    { "english": "to invite", "german": "einladen", "example": "Who are you going to invite to your party?" },
+    { "english": "to fly to", "german": "fliegen nach", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to go fishing", "german": "angeln gehen", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to stay at a campsite", "german": "auf einem Campingplatz übernachten", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to swim in the sea", "german": "im Meer schwimmen", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to play badminton", "german": "Badminton spielen", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to lie in the sun", "german": "in der Sonne liegen", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to write a postcard", "german": "eine Postkarte schreiben", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to visit a city", "german": "eine Stadt besuchen", "example": null, "origin": "word-file", "translationSource": "suggested" },
+    { "english": "to play board games", "german": "Brettspiele spielen", "example": null, "origin": "word-file", "translationSource": "suggested" }
+  ]
+}

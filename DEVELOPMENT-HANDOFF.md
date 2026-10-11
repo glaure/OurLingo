@@ -57,7 +57,7 @@ Current features:
 - Typed and multiple-choice practice in both language directions, with scoring and missed-word retries.
 - Matching-pairs mode: up to five English/German pairs, independently shuffled columns, either-side-first selection, locked matched tiles and mismatch feedback. Each board repeats for three full passes, reshuffling between passes; results score first-try matches from pass one. Retry prioritises missed words and fills from the same unit. Ambiguous or overlapping translations are excluded; small units use fewer pairs, with at least two required.
 - Parent-space learning report records per-word first-attempt outcomes locally. Three correct completed rounds in a row marks a word known; there are no separate learner profiles or cross-device sync.
-- The app version is displayed in the page footer and matches npm/Tauri version `0.1.0`.
+- The app version is displayed in the page footer and matches npm/Tauri version `0.1.1`.
 - The interface follows the operating system light/dark appearance preference.
 - Search, add/remove/edit vocabulary and example sentences; selected-unit JSON downloads include unsaved edits.
 - Responsive layouts tested at 1440, 768, 390 and 320 pixels, plus five short matching pairs visible on a 320x844 phone.
@@ -72,7 +72,7 @@ Current features:
 - `src/vocabulary.test.ts`: Node tests run through tsx.
 - `tests/workflow.spec.ts` and `playwright.config.ts`: browser tests, with a dedicated test server on port 5178.
 - `tsconfig.node.json`: checks both test suites and Playwright configuration using Node and DOM types.
-- `public/data/`: five supplied workbook datasets.
+- `public/data/`: twenty-four supplied workbook datasets.
 - `README.md`: current features, startup instructions and storage limitations.
 
 Original Vite starter files such as `src/App.tsx`, `src/App.css` and `src/index.css` remain unused. Do not confuse them with the active implementation or remove them as unrelated cleanup during packaging.
@@ -85,11 +85,36 @@ Bundled manual transcriptions:
 | --- | --- | --- | --- |
 | MORE! 1 | 1 | 42 | 40 |
 | MORE! 1 | 2 | 41 | 37 |
+| MORE! 1 | 3 | 31 | 24 |
+| MORE! 1 | 4 | 42 | 32 |
+| MORE! 1 | 5 | 43 | 31 |
+| MORE! 1 | 6 | 38 | 33 |
+| MORE! 1 | 7 | 28 | 23 |
+| MORE! 1 | 8 | 27 | 14 |
+| MORE! 1 | 9 | 40 | 36 |
+| MORE! 1 | 10 | 44 | 24 |
+| MORE! 1 | 11 | 38 | 30 |
+| MORE! 1 | 12 | 65 | 30 |
+| MORE! 1 | 13 | 41 | 39 |
+| MORE! 1 | 14 | 44 | 44 |
+| MORE! 1 | 15 | 23 | 14 |
 | MORE! 2 | 1 | 45 | 34 |
 | MORE! 2 | 2 | 39 | 39 |
 | MORE! 2 | 3 | 33 | 27 |
+| MORE! 2 | 4 | 35 | 35 |
+| MORE! 2 | 5 | 37 | 28 |
+| MORE! 2 | 6 | 35 | 25 |
+| MORE! 2 | 7 | 30 | 21 |
+| MORE! 2 | 8 | 33 | 26 |
+| MORE! 2 | 9 | 31 | 26 |
+| MORE! 2 | 10 | 26 | 22 |
+| MORE! 2 | 11 | 29 | 23 |
+| MORE! 2 | 12 | 33 | 24 |
+| MORE! 2 | 13 | 33 | 32 |
+| MORE! 2 | 14 | 38 | 25 |
+| MORE! 2 | 15 | 24 | 14 |
 
-The five bundled datasets are approved for immediate practice; parent-created units remain pending. MORE! 2 Units 1 and 3 include 11 and six illustrated Word File terms with suggested German translations, explicitly marked using origin and translationSource metadata. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
+The thirty bundled datasets are approved for practice; parent-created units remain pending. MORE! 1 Units 3, 5, 7-10, 12 and 15 and MORE! 2 Units 1, 3, and 5-15 include illustrated terms with suggested German translations, explicitly marked using origin and translationSource metadata. MORE! 1 Units 12-15 and MORE! 2 Unit 13 are partial cropped-page transcriptions; do not treat them as complete until the missing page portions are transcribed. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
 
 Browser storage uses localStorage key `ourlingo.library.v1`. Units are identified by book plus unit number. Legacy `ourlingo.more-1-unit-1.v1` data migrates automatically with edits and approval retained. The old copy is kept.
 
@@ -103,7 +128,7 @@ Before migrating real data, provide and test an import/restore path. Existing JS
 
 Setup progress and remaining work:
 
-1. Windows prerequisites and the browser baseline are verified; build, lint, 20 unit tests and 30 browser tests pass.
+1. Windows prerequisites and the browser baseline are verified; build, lint, 21 unit tests and 55 browser tests pass.
 2. Tauri v2 is configured to use Vite and `dist`; Android support is initialized. `npm run tauri` is required by generated Gradle tasks.
 3. The arm64 debug APK builds at `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk` and launches in the API 37 emulator.
 4. The offline library, review/approval and a correct typed-practice answer are smoke-tested. Verify multiple-choice and matching modes offline and test a physical device.
