@@ -9,7 +9,7 @@ export interface Entry {
 export interface VocabularyUnit {
   schemaVersion: 1
   book: 'MORE! 1' | 'MORE! 2'
-  unit: number
+  unit: number | 'irregular-verbs'
   title: string
   source: string
   reviewStatus: 'pending' | 'approved'
@@ -49,6 +49,7 @@ export const bundledUnitFiles = [
   { book: 'MORE! 2', unit: 13, file: 'more-2-unit-13.json' },
   { book: 'MORE! 2', unit: 14, file: 'more-2-unit-14.json' },
   { book: 'MORE! 2', unit: 15, file: 'more-2-unit-15.json' },
+  { book: 'MORE! 2', unit: 'irregular-verbs', file: 'more-2-irregular-verbs.json' },
 ] as const
 
 export interface VocabularyLibrary {
@@ -59,7 +60,7 @@ export interface VocabularyLibrary {
 
 export interface LearningProgressRecord {
   book: VocabularyUnit['book']
-  unit: number
+  unit: VocabularyUnit['unit']
   english: string
   german: string
   correctAttempts: number
@@ -83,6 +84,18 @@ export function unitKey(unit: Pick<VocabularyUnit, 'book' | 'unit'>): string {
   return `${unit.book}:${unit.unit}`
 }
 
+export function unitLabel(unit: Pick<VocabularyUnit, 'unit'>): string {
+  return unit.unit === 'irregular-verbs' ? 'Irregular Verbs' : `Unit ${unit.unit}`
+}
+
+function isUnitIdentity(book: unknown, unit: unknown): boolean {
+  return (
+    (book === 'MORE! 1' || book === 'MORE! 2') &&
+    ((typeof unit === 'number' && Number.isInteger(unit) && unit > 0) ||
+      (book === 'MORE! 2' && unit === 'irregular-verbs'))
+  )
+}
+
 export const learningProgressStorageKey = 'ourlingo.learning.v1'
 
 export function isLearningProgress(value: unknown): value is LearningProgress {
@@ -95,9 +108,7 @@ export function isLearningProgress(value: unknown): value is LearningProgress {
       if (!record || typeof record !== 'object') return false
       const item = record as Partial<LearningProgressRecord>
       return (
-        (item.book === 'MORE! 1' || item.book === 'MORE! 2') &&
-        Number.isInteger(item.unit) &&
-        Number(item.unit) > 0 &&
+        isUnitIdentity(item.book, item.unit) &&
         typeof item.english === 'string' &&
         typeof item.german === 'string' &&
         Number.isInteger(item.correctAttempts) &&
@@ -181,7 +192,9 @@ export function upsertUnit(
     schemaVersion: 1,
     units: [...units, unit].sort(
       (first, second) =>
-        first.book.localeCompare(second.book) || first.unit - second.unit,
+        first.book.localeCompare(second.book) ||
+        (typeof first.unit === 'number' ? first.unit : Infinity) -
+          (typeof second.unit === 'number' ? second.unit : Infinity),
     ),
   }
 }
@@ -220,9 +233,7 @@ export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
   const unit = value as Partial<VocabularyUnit>
   return (
     unit.schemaVersion === 1 &&
-    (unit.book === 'MORE! 1' || unit.book === 'MORE! 2') &&
-    Number.isInteger(unit.unit) &&
-    Number(unit.unit) > 0 &&
+    isUnitIdentity(unit.book, unit.unit) &&
     typeof unit.title === 'string' &&
     typeof unit.source === 'string' &&
     (unit.reviewStatus === 'pending' || unit.reviewStatus === 'approved') &&

@@ -13,6 +13,7 @@ import {
   learningProgressStorageKey,
   mergeBundledUnits,
   unitKey,
+  unitLabel,
   updateLearningProgress,
   upsertUnit,
   validateEntries,
@@ -33,6 +34,33 @@ const unitTwo: unknown = JSON.parse(
   ),
 )
 assert.ok(isVocabularyUnit(unitTwo))
+
+test('MORE! 2 irregular verbs preserve forms and special identity across library and progress saves', () => {
+  const verbs: unknown = JSON.parse(readFileSync(
+    new URL('../public/data/more-2-irregular-verbs.json', import.meta.url), 'utf8',
+  ))
+  assert.ok(isVocabularyUnit(verbs))
+  assert.equal(verbs.entries.length, 59)
+  assert.equal(validateEntries(verbs.entries), null)
+  assert.equal(unitKey(verbs), 'MORE! 2:irregular-verbs')
+  assert.equal(unitLabel(verbs), 'Irregular Verbs')
+  assert.equal(isVocabularyUnit({ ...verbs, book: 'MORE! 1' }), false)
+  assert.equal(isVocabularyUnit({ ...verbs, unit: 'other' }), false)
+  assert.ok(verbs.entries.every((entry) => entry.example === null && entry.english.split(' - ').length === 3))
+  assert.deepEqual(verbs.entries[0], { english: 'be - was/were - been', german: 'sein', example: null })
+  assert.ok(verbs.entries.some((entry) => entry.english === 'read - read - read' && entry.german === 'lesen'))
+  const numeric = { ...unitTwo, book: 'MORE! 2' as const, unit: 16 }
+  const merged = mergeBundledUnits({ schemaVersion: 1, units: [numeric] }, [verbs])
+  assert.deepEqual(merged.units.map((item) => item.unit), [16, 'irregular-verbs'])
+  assert.ok(isVocabularyLibrary(JSON.parse(JSON.stringify(merged))))
+  const edited = { ...verbs, entries: [{ ...verbs.entries[0], german: 'parent edit' }] }
+  assert.deepEqual(mergeBundledUnits(upsertUnit(merged, edited), [verbs]).units[1], edited)
+  assert.equal(mergeBundledUnits({ ...merged, units: [numeric] }, [verbs]).units.length, 1)
+  const progress = updateLearningProgress({ schemaVersion: 1, records: [] }, verbs,
+    [{ ...verbs.entries[0], correct: true }], '2026-10-13T12:00:00Z')
+  assert.ok(isLearningProgress(JSON.parse(JSON.stringify(progress))))
+  assert.equal(isLearningProgress({ ...progress, records: [{ ...progress.records[0], book: 'MORE! 1' }] }), false)
+})
 
 const moreOneNewUnits = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((number) => {
   const data: unknown = JSON.parse(

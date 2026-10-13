@@ -25,6 +25,20 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+    signingConfigs {
+        create("upload") {
+            val uploadStore = System.getenv("OURLINGO_UPLOAD_STORE")
+            if (!uploadStore.isNullOrBlank()) {
+                storeFile = file(uploadStore)
+                storePassword = System.getenv("OURLINGO_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("OURLINGO_UPLOAD_ALIAS")
+                keyPassword = System.getenv("OURLINGO_UPLOAD_KEY_PASSWORD")
+                require(!storePassword.isNullOrBlank() && !keyAlias.isNullOrBlank() && !keyPassword.isNullOrBlank()) {
+                    "Upload signing requires OURLINGO_UPLOAD_STORE_PASSWORD, OURLINGO_UPLOAD_ALIAS and OURLINGO_UPLOAD_KEY_PASSWORD."
+                }
+            }
+        }
+    }
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
@@ -40,6 +54,9 @@ android {
             }
         }
         getByName("release") {
+            if (!System.getenv("OURLINGO_UPLOAD_STORE").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("upload")
+            }
             optimization {
                enable = true
             }

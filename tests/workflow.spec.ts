@@ -25,6 +25,50 @@ const moreOneFixtures = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(
     ) as VocabularyUnit,
 )
 
+test('MORE! 2 Irregular Verbs supports phone review, practice, progress and permanent deletion', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 })
+  await page.goto('/')
+  const practise = page.getByRole('button', { name: 'Practise MORE! 2 Irregular Verbs', exact: true })
+  await expect(practise).toBeEnabled()
+  await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
+  await expect(page.locator('.unit-card')).toHaveCount(16)
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Add unit', exact: true }).click()
+  await expect(page.getByLabel('Unit number', { exact: true })).toHaveValue('16')
+  await page.getByRole('button', { name: 'Review MORE! 2 Irregular Verbs', exact: true }).click()
+  await expect(page.locator('.vocabulary-row')).toHaveCount(59)
+  await expect(page.getByLabel('English entry 1', { exact: true })).toHaveValue('be - was/were - been')
+  await page.getByLabel('German entry 1', { exact: true }).fill('sein; existieren')
+  await page.getByRole('button', { name: 'Save & approve', exact: true }).click()
+  await page.reload()
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Review MORE! 2 Irregular Verbs', exact: true }).click()
+  await expect(page.getByLabel('German entry 1', { exact: true })).toHaveValue('sein; existieren')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/irregular-verbs-phone.png', fullPage: true })
+  await page.getByRole('button', { name: 'Kid space', exact: true }).click()
+  await practise.click()
+  await page.getByText('Type answer', { exact: true }).click()
+  await page.getByLabel('Words per round').selectOption('5')
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const verbs = JSON.parse(readFileSync('public/data/more-2-irregular-verbs.json', 'utf8')) as VocabularyUnit
+  for (let question = 0; question < 5; question++) {
+    const prompt = await page.locator('.question-word').innerText()
+    const entry = verbs.entries.find((item) => item.german === prompt || (item.german === 'sein' && prompt === 'sein; existieren'))!
+    await page.getByRole('textbox', { name: 'In English', exact: true }).fill(entry.english)
+    await page.getByRole('button', { name: 'Check answer', exact: true }).click()
+    await page.getByRole('button', { name: question === 4 ? 'See results' : 'Next word', exact: true }).click()
+  }
+  await page.reload()
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem('ourlingo.learning.v1')!).records)
+  expect(records.filter((record: { unit: string }) => record.unit === 'irregular-verbs')).toHaveLength(5)
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Delete MORE! 2 Irregular Verbs', exact: true }).click()
+  await page.reload()
+  await expect(practise).toHaveCount(0)
+})
+
 async function openReview(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
@@ -299,7 +343,7 @@ test('kid space is the default, migration preserves approved edits, and parent c
   const migrated = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(migrated.units).toHaveLength(30)
+  expect(migrated.units).toHaveLength(31)
   expect(migrated.units[0].entries[0].german).toBe('geben; schenken')
   expect(migrated.units[0].reviewStatus).toBe('approved')
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
@@ -356,7 +400,7 @@ test('create units in both books, keep their words separate, and practise the se
     await expect(page.getByRole('status')).toContainText('approved and saved')
   }
   await page.getByRole('button', { name: 'Kid space', exact: true }).click()
-  await expect(page.locator('.unit-card')).toHaveCount(32)
+  await expect(page.locator('.unit-card')).toHaveCount(33)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
@@ -380,7 +424,7 @@ test('create units in both books, keep their words separate, and practise the se
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(stored.units).toHaveLength(32)
+  expect(stored.units).toHaveLength(33)
   expect(
     stored.units.find(
       (item: VocabularyUnit) => item.book === 'MORE! 1' && item.unit === 1,
@@ -390,12 +434,12 @@ test('create units in both books, keep their words separate, and practise the se
   await expect(
     page.getByRole('region', { name: 'Kid space', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('.unit-card')).toHaveCount(32)
+  await expect(page.locator('.unit-card')).toHaveCount(33)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 16', exact: true }),
   ).toBeEnabled()
   await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
-  await expect(page.locator('.unit-card')).toHaveCount(16)
+  await expect(page.locator('.unit-card')).toHaveCount(17)
 })
 
 test('duplicate units cannot overwrite data and unsaved review changes require confirmation', async ({
@@ -407,7 +451,7 @@ test('duplicate units cannot overwrite data and unsaved review changes require c
   await page.getByLabel('Unit number', { exact: true }).fill('1')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('already exists')
-  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await expect(page.locator('.unit-card')).toHaveCount(31)
   await page.getByLabel('Unit number', { exact: true }).fill('16')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await page.getByRole('button', { name: 'Add a word or phrase' }).click()
@@ -439,7 +483,7 @@ test('confirmed unit deletion persists and an empty library does not restore del
   await page
     .getByRole('button', { name: 'Delete MORE! 1 Unit 1', exact: true })
     .click()
-  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await expect(page.locator('.unit-card')).toHaveCount(31)
   for (const name of [
     'MORE! 1 Unit 1',
     'MORE! 1 Unit 2',
@@ -471,6 +515,7 @@ test('confirmed unit deletion persists and an empty library does not restore del
     'MORE! 2 Unit 13',
     'MORE! 2 Unit 14',
     'MORE! 2 Unit 15',
+    'MORE! 2 Irregular Verbs',
   ]) {
     page.once('dialog', (dialog) => dialog.accept())
     await page
@@ -628,7 +673,7 @@ test('previously installed bundled units are approved on upgrade', async ({
     )
   }, allUnits)
   await page.goto('/')
-  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await expect(page.locator('.unit-card')).toHaveCount(31)
   for (const bundled of allUnits) {
     await expect(
       page.getByRole('button', {
@@ -714,7 +759,7 @@ test('an unavailable Unit 2 download leaves saved Unit 1 available', async ({
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(29)
+  await expect(page.locator('.unit-card')).toHaveCount(30)
 })
 
 for (const fixture of moreOneFixtures) {
@@ -811,7 +856,7 @@ for (const fixture of moreTwoFixtures) {
       }),
     ).toBeEnabled()
     await page.getByRole('radio', { name: 'MORE! 2', exact: true }).check()
-    await expect(page.locator('.unit-card')).toHaveCount(15)
+    await expect(page.locator('.unit-card')).toHaveCount(16)
     await page
       .getByRole('button', { name: 'Parent space', exact: true })
       .click()
@@ -947,7 +992,7 @@ test('MORE! 2 additions preserve edited vocabulary and approval in an existing l
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await expect(page.locator('.unit-card')).toHaveCount(31)
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await page
     .getByRole('button', { name: 'Review MORE! 2 Unit 1', exact: true })

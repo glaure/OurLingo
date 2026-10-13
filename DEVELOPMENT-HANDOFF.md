@@ -113,10 +113,11 @@ Bundled manual transcriptions:
 | MORE! 2 | 13 | 33 | 32 |
 | MORE! 2 | 14 | 38 | 25 |
 | MORE! 2 | 15 | 24 | 14 |
+| MORE! 2 | Irregular Verbs | 59 | 0 |
 
-The thirty bundled datasets are approved for practice; parent-created units remain pending. MORE! 1 Units 3, 5, 7-10, 12 and 15 and MORE! 2 Units 1, 3, and 5-15 include illustrated terms with suggested German translations, explicitly marked using origin and translationSource metadata. MORE! 1 Units 12-15 and MORE! 2 Unit 13 are partial cropped-page transcriptions; do not treat them as complete until the missing page portions are transcribed. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
+The 31 bundled datasets are approved for practice; parent-created units remain pending. MORE! 1 Units 3, 5, 7-10, 12 and 15 and MORE! 2 Units 1, 3, and 5-15 include illustrated terms with suggested German translations, explicitly marked using origin and translationSource metadata. MORE! 1 Units 12-15 and MORE! 2 Unit 13 are partial cropped-page transcriptions; do not treat them as complete until the missing page portions are transcribed. Editing a suggestion changes its source to parent. Preserve that provenance when saving, exporting or importing.
 
-Browser storage uses localStorage key `ourlingo.library.v1`. Units are identified by book plus unit number. Legacy `ourlingo.more-1-unit-1.v1` data migrates automatically with edits and approval retained. The old copy is kept.
+Browser storage uses localStorage key `ourlingo.library.v1`. Units are identified by book plus numeric unit number, or `irregular-verbs` for the special MORE! 2 unit. Learning progress accepts the same identity. The special unit sorts after numbered units and does not affect the next numeric unit suggestion. Its English entries retain all three forms as `base - past tense - past participle`; no examples are invented. Legacy `ourlingo.more-1-unit-1.v1` data migrates automatically with edits and approval retained. The old copy is kept.
 
 `bundledUnitFiles` lists supplementary datasets; `installBundledUnits` loads them independently. `mergeBundledUnits` preserves populated units and approvals, fills empty pending drafts while retaining titles, and records bundledUnitKeys so deleted imports do not reappear. Failed downloads do not discard saved vocabulary or prevent other bundles loading.
 
@@ -128,7 +129,7 @@ Before migrating real data, provide and test an import/restore path. Existing JS
 
 Setup progress and remaining work:
 
-1. Windows prerequisites and the browser baseline are verified; build, lint, 21 unit tests and 55 browser tests pass.
+1. Windows prerequisites and the browser baseline are verified; build, lint, 22 unit tests and 56 browser tests pass.
 2. Tauri v2 is configured to use Vite and `dist`; Android support is initialized. `npm run tauri` is required by generated Gradle tasks.
 3. The arm64 debug APK builds at `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk` and launches in the API 37 emulator.
 4. The offline library, review/approval and a correct typed-practice answer are smoke-tested. Verify multiple-choice and matching modes offline and test a physical device.

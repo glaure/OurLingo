@@ -38,6 +38,7 @@ import {
   mergeBundledUnits,
   storageKey,
   unitKey,
+  unitLabel,
   upsertUnit,
   updateLearningProgress,
   validateEntries,
@@ -165,7 +166,7 @@ export default function OurLingo() {
           updated = merged
         } catch {
           if (controller.signal.aborted) return updated
-          failed.push(`${bundled.book} Unit ${bundled.unit}`)
+          failed.push(`${bundled.book} ${unitLabel(bundled)}`)
         }
       }
       if (failed.length)
@@ -409,7 +410,7 @@ export default function OurLingo() {
         0,
         ...(library?.units
           .filter((item) => item.book === book)
-          .map((item) => item.unit) || []),
+          .flatMap((item) => typeof item.unit === 'number' ? [item.unit] : []) || []),
       ) + 1,
     )
   }
@@ -461,7 +462,7 @@ export default function OurLingo() {
     if (!library || space !== 'parent') return
     if (
       !window.confirm(
-        `Delete ${selected.book} Unit ${selected.unit} and all of its vocabulary?`,
+        `Delete ${selected.book} ${unitLabel(selected)} and all of its vocabulary?`,
       )
     )
       return
@@ -695,7 +696,7 @@ export default function OurLingo() {
           <div className="book-spine">{unit?.book === 'MORE! 2' ? 2 : 1}</div>
           <div>
             <strong>{unit?.book || 'OurLingo'}</strong>
-            <span>{unit ? `Unit ${unit.unit}` : 'Your units'}</span>
+            <span>{unit ? unitLabel(unit) : 'Your units'}</span>
           </div>
           <span className="unit-dot" />
         </div>
@@ -774,7 +775,7 @@ export default function OurLingo() {
                 ? 'My units'
                 : view === 'report'
                   ? 'Learning report'
-                  : `Unit ${unit?.unit}`}
+                  : unit ? unitLabel(unit) : 'Your units'}
             </strong>
           </div>
           <div className="topbar-actions">
@@ -817,7 +818,7 @@ export default function OurLingo() {
                     ? "Let's learn"
                     : 'Your unit library'
                   : view === 'review'
-                    ? `Unit ${unit?.unit} vocabulary`
+                    ? `${unit ? unitLabel(unit) : 'Your unit'} vocabulary`
                     : view === 'report'
                       ? 'Learning report'
                       : 'A little practice'}
@@ -827,7 +828,7 @@ export default function OurLingo() {
                   ? 'MORE! 1 + MORE! 2 · English / Deutsch'
                   : view === 'report'
                     ? 'Progress saved on this device'
-                  : `${unit?.book} · Unit ${unit?.unit}`}
+                  : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
               </p>
             </div>
             {view !== 'library' && view !== 'report' && (
@@ -994,8 +995,8 @@ export default function OurLingo() {
                         {space === 'parent' && (
                           <button
                             className="icon-button delete-button"
-                            aria-label={`Delete ${item.book} Unit ${item.unit}`}
-                            title={`Delete ${item.book} Unit ${item.unit}`}
+                            aria-label={`Delete ${item.book} ${unitLabel(item)}`}
+                            title={`Delete ${item.book} ${unitLabel(item)}`}
                             onClick={() => deleteUnit(item)}
                           >
                             <Trash2 size={17} />
@@ -1003,11 +1004,11 @@ export default function OurLingo() {
                         )}
                       </div>
                       <div className="unit-card-heading">
-                        <span className="unit-number">{item.unit}</span>
+                        <span className="unit-number">{typeof item.unit === 'number' ? item.unit : <BookOpen size={24} />}</span>
                         <div>
-                          <h2>Unit {item.unit}</h2>
+                          <h2>{unitLabel(item)}</h2>
                           <p>
-                            {item.title === `Unit ${item.unit}`
+                            {item.title === unitLabel(item)
                               ? item.book
                               : item.title}
                           </p>
@@ -1029,7 +1030,7 @@ export default function OurLingo() {
                         disabled={
                           space === 'kid' && item.reviewStatus !== 'approved'
                         }
-                        aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} Unit ${item.unit}`}
+                        aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} ${unitLabel(item)}`}
                         onClick={() => selectUnit(item)}
                       >
                         {space === 'kid' ? (
@@ -1086,15 +1087,15 @@ export default function OurLingo() {
                 return (
                   <section
                     className="report-unit"
-                    aria-label={`${reportUnit.book} Unit ${reportUnit.unit} progress`}
+                    aria-label={`${reportUnit.book} ${unitLabel(reportUnit)} progress`}
                     key={unitKey(reportUnit)}
                   >
                     <div className="report-unit-heading">
                       <div>
                         <span>{reportUnit.book}</span>
-                        <h2>Unit {reportUnit.unit}</h2>
+                        <h2>{unitLabel(reportUnit)}</h2>
                         <p>
-                          {reportUnit.title === `Unit ${reportUnit.unit}`
+                          {reportUnit.title === unitLabel(reportUnit)
                             ? reportUnit.book
                             : reportUnit.title}
                         </p>
@@ -1106,7 +1107,7 @@ export default function OurLingo() {
                     <progress
                       max={reportUnit.entries.length || 1}
                       value={known.length}
-                      aria-label={`${reportUnit.book} Unit ${reportUnit.unit} known words`}
+                      aria-label={`${reportUnit.book} ${unitLabel(reportUnit)} known words`}
                     />
                     <div className="report-word-groups">
                       <details>
@@ -1361,7 +1362,7 @@ export default function OurLingo() {
                     Add a word or phrase
                   </button>
                   <span>
-                    {unit.book} · Unit {unit.unit}
+                    {unit.book} · {unitLabel(unit)}
                   </span>
                 </div>
               </section>
@@ -1395,7 +1396,7 @@ export default function OurLingo() {
                   <div className="eyebrow">YOUR NEXT SMALL WIN</div>
                   <h2>Ready when you are.</h2>
                   <p>
-                    {unit.book} · Unit {unit.unit} · {entries.length} words &
+                    {unit.book} · {unitLabel(unit)} · {entries.length} words &
                     phrases
                   </p>
                   <fieldset className="direction-field mode-field">

@@ -1,6 +1,6 @@
 # OurLingo
 
-A family vocabulary learning app with MORE! 1, Units 1-15, and MORE! 2, Units 1-15.
+A family vocabulary learning app with MORE! 1, Units 1-15, and MORE! 2, Units 1-15 plus Irregular Verbs.
 
 For the Windows workspace transition and proposed Tauri v2 packaging work, see [Development Handoff](DEVELOPMENT-HANDOFF.md).
 
@@ -12,7 +12,8 @@ For the Windows workspace transition and proposed Tauri v2 packaging work, see [
 - Review user-photo transcriptions: MORE! 1 has 42/41/31/42/43/38/28/27/40/44/38 entries in Units 1-11; visible portions of Units 12-15 add 65/41/44/23 entries. MORE! 2 has 45/39/33/35/37/35/30/33/31/26/29/33/33/38/24 entries in Units 1-15.
 - Word File illustrations are included with explicitly labelled suggested German translations. Editing those translations marks them as parent translations; their provenance is preserved on save and download.
 - Edit English, German and examples, search across all fields, and add or remove entries.
-- The thirty bundled lessons are ready to practise; parent-created units require approval first.
+- The 31 bundled lessons are ready to practise; parent-created units require approval first.
+- MORE! 2 includes a separate Irregular Verbs unit with 59 photographed verb rows. English answers contain the base form, past tense and past participle together, separated by ` - `, alongside the German meaning.
 - Practise in either direction with 5, 10 or all words, then retry missed words.
 - Choose typed answers or multiple choice. Multiple choice has one correct answer and up to three distinct distractors, excluding known overlapping translations and prompts. Small units use fewer choices; questions without a safe distractor are omitted.
 - Matching pairs shows up to five English words on the left and their German translations independently shuffled on the right. Select either side first; correct pairs stay in place and lock, while a wrong match can be tried again. Boards exclude overlapping answers in both languages and need at least two unambiguous pairs.
@@ -161,7 +162,9 @@ Use `adb devices -l` to confirm a device is connected. Test the packaged app wit
 
 ## Data and Limitations
 
-The bundled datasets under `public/data/` cover MORE! 1, Units 1-15, and MORE! 2, Units 1-15. They are manual transcriptions of user-provided photos, not automated OCR results. These thirty lessons are approved for immediate practice. Parent-created units still start pending until approved. Existing saved edits are preserved when approval is migrated; deleted bundled lessons stay deleted.
+The bundled datasets under `public/data/` cover MORE! 1, Units 1-15, and MORE! 2, Units 1-15 plus Irregular Verbs. They are manual transcriptions of user-provided photos, not automated OCR results. These 31 lessons are approved for immediate practice. Parent-created units still start pending until approved. Existing saved edits are preserved when approval is migrated; deleted bundled lessons stay deleted.
+
+The special MORE! 2 Irregular Verbs unit uses the identity `irregular-verbs`, leaving numeric Unit 16 available. It transcribes 59 rows from the supplied year-1 sheet without adding example sentences. The three English columns are retained as `base form - past tense - past participle`; typed English answers require that complete sequence. The printed `read` forms have identical spelling despite different pronunciation; the handwritten pronunciation annotations are not answer text. Existing practice modes use the complete sequence against its German meaning, not individual conjugation questions.
 
 Each additional bundled unit is added once to existing libraries without replacing populated units or their approval. Empty pending drafts receive the matching transcription, retaining their titles. `bundledUnitKeys` remembers imported units so deletion stays permanent. A failed download does not prevent other units loading or remove saved vocabulary; refreshing retries failed additions. The files to load are listed in `bundledUnitFiles` in `src/vocabulary.ts`.
 
@@ -173,7 +176,7 @@ The library is held in localStorage under `ourlingo.library.v1`, separately for 
 
 In parent space, choose **Add unit**, select the book and unit number, and optionally enter a title. A new unit is saved as an empty draft. Add vocabulary in its review screen and choose **Save & approve** when complete. Pending units are visible but not playable in kid space. Unit deletion and abandoning unsaved edits or unfinished rounds require confirmation.
 
-The thirty supplied units come with visible photo transcriptions and marked Word File suggestions. MORE! 1 Units 12-15 and MORE! 2 Unit 13 are incomplete until the missing page portions are supplied. Other units must be entered by a parent; no unseen textbook contents are invented. Saved data is not written back to source files or synchronized to other devices. Clearing site data removes the library. JSON downloads copy the selected unit, including unsaved edits; restore/import is not implemented yet.
+The 31 supplied units come with visible photo transcriptions; illustrated Word File translations are marked as suggestions. MORE! 1 Units 12-15 and MORE! 2 Unit 13 are incomplete until the missing page portions are supplied. Other units must be entered by a parent; no unseen textbook contents are invented. Saved data is not written back to source files or synchronized to other devices. Clearing site data removes the library. JSON downloads copy the selected unit, including unsaved edits; restore/import is not implemented yet.
 
 Round scores are shown after each round. Per-word first-attempt counts and correct streaks are saved locally under `ourlingo.learning.v1`; the parent report marks a word known after three correct completed rounds in a row. Progress is separate on every browser/app installation and does not sync between devices. There are no separate learner profiles yet. Image uploads and automated page scanning are not implemented.
 
