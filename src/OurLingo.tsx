@@ -34,11 +34,14 @@ import {
   createRound,
   isLearningProgress,
   isCorrectAnswer,
+  isUnitCompleted,
   isVocabularyLibrary,
   isVocabularyUnit,
+  knownStreak,
   learningProgressStorageKey,
   libraryStorageKey,
   mergeBundledUnits,
+  progressionUnits,
   storageKey,
   unitKey,
   unitLabel,
@@ -59,9 +62,10 @@ import {
   loadSettings,
   saveSettings,
   themePreferences,
+  unitProgressions,
   watchSystemTheme,
 } from './settings'
-import type { Settings, ThemePreference } from './settings'
+import type { Settings, ThemePreference, UnitProgression } from './settings'
 import './OurLingo.css'
 
 type View = 'library' | 'review' | 'practice' | 'report' | 'settings'
@@ -74,6 +78,10 @@ const themeLabels: Record<ThemePreference, string> = {
   system: 'System',
   light: 'Light',
   dark: 'Dark',
+}
+const progressionLabels: Record<UnitProgression, string> = {
+  all: 'All units',
+  'completed-and-next': 'Completed + next',
 }
 
 function loadLearningProgress(): LearningProgress {
@@ -150,7 +158,12 @@ export default function OurLingo() {
       : 'all'
   const preferredUnits =
     library?.units.filter((item) => preferredBooks.includes(item.book)) || []
-  const libraryUnits = preferredUnits.filter(
+  const progressionActive =
+    space === 'kid' && settings.progression === 'completed-and-next'
+  const spaceUnits = progressionActive
+    ? progressionUnits(preferredUnits, learningProgress)
+    : preferredUnits
+  const libraryUnits = spaceUnits.filter(
     (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
   )
   const unitView = view === 'review' || view === 'practice'
@@ -763,7 +776,7 @@ export default function OurLingo() {
           >
             <BookOpen size={19} />
             My units
-            <span className="nav-count">{preferredUnits.length}</span>
+            <span className="nav-count">{spaceUnits.length}</span>
           </button>
           {space === 'parent' && unit && (
             <>
@@ -1048,6 +1061,12 @@ export default function OurLingo() {
                   </button>
                 </form>
               )}
+              {progressionActive && (
+                <p className="library-note">
+                  Completed units stay here to practise again. Know every word
+                  of a unit to unlock the next one.
+                </p>
+              )}
               <div className="unit-grid">
                 {libraryUnits.map((item) => (
                   <article
@@ -1084,9 +1103,12 @@ export default function OurLingo() {
                         className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
                       >
                         <span />
-                        {item.reviewStatus === 'approved'
-                          ? 'Ready'
-                          : 'Awaiting review'}
+                        {item.reviewStatus !== 'approved'
+                          ? 'Awaiting review'
+                          : space === 'kid' &&
+                              isUnitCompleted(item, learningProgress)
+                            ? 'Completed'
+                            : 'Ready'}
                       </span>
                     </div>
                     <button
@@ -1166,6 +1188,37 @@ export default function OurLingo() {
                   })}
                 </div>
               </fieldset>
+              <fieldset className="settings-group">
+                <legend>Units</legend>
+                <p>
+                  Choose which units kid space shows. With "Completed + next",
+                  finished units stay available to practise again, and the next
+                  unit of each book unlocks when every word of a unit is known
+                  ({knownStreak} correct first tries in a row). Parent space
+                  always shows every unit.
+                </p>
+                <div className="segmented progression-choice">
+                  {unitProgressions.map((progression) => (
+                    <label
+                      key={progression}
+                      className={
+                        settings.progression === progression ? 'selected' : ''
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="progression"
+                        value={progression}
+                        checked={settings.progression === progression}
+                        onChange={() =>
+                          updateSettings({ ...settings, progression })
+                        }
+                      />
+                      {progressionLabels[progression]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </section>
           )}
           {library && space === 'parent' && view === 'report' && (
@@ -1185,13 +1238,13 @@ export default function OurLingo() {
                     .map((record) => [record.english, record]),
                 )
                 const known = reportUnit.entries.filter(
-                  (entry) => (records.get(entry.english)?.correctStreak ?? 0) >= 3,
+                  (entry) => (records.get(entry.english)?.correctStreak ?? 0) >= knownStreak,
                 )
                 const inProgress = reportUnit.entries.filter((entry) => {
                   const record = records.get(entry.english)
                   return (
                     !!record &&
-                    record.correctStreak < 3 &&
+                    record.correctStreak < knownStreak &&
                     record.correctAttempts + record.incorrectAttempts > 0
                   )
                 })

@@ -51,6 +51,18 @@ body {
   min-width: 320px;
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
+/* Keeps scrolled content from showing through a transparent Android status bar. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--safe-top);
+  background: #f7f9f8;
+  z-index: 100;
+}
+:where(:root[data-theme='dark']) body::before {
+  background: #141a16;
+}
 button,
 input,
 textarea,

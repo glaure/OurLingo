@@ -195,7 +195,11 @@
 .segmented.theme-choice {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.theme-choice label {
+.segmented.progression-choice {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.theme-choice label,
+.progression-choice label {
   text-align: center;
 }
 .book-choices {
@@ -229,6 +233,12 @@
 }
 .book-choice:has(input:focus-visible) {
   outline: 3px solid #d0a849;
+}
+.library-note {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: -8px 0 20px;
 }
 .report-note {
   color: var(--muted);

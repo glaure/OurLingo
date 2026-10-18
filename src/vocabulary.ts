@@ -164,6 +164,52 @@ export function updateLearningProgress(
   return { schemaVersion: 1, records }
 }
 
+// A word is known after this many correct first attempts in a row.
+export const knownStreak = 3
+
+export function isUnitCompleted(
+  unit: VocabularyUnit,
+  progress: LearningProgress,
+): boolean {
+  if (!unit.entries.length) return false
+  const streaks = new Map(
+    progress.records
+      .filter((record) => record.book === unit.book && record.unit === unit.unit)
+      .map((record) => [record.english, record.correctStreak]),
+  )
+  return unit.entries.every(
+    (entry) => (streaks.get(entry.english) ?? 0) >= knownStreak,
+  )
+}
+
+// Completed units stay available for revision, and each book also offers its
+// first unfinished approved unit. Irregular Verbs is a reference list used
+// alongside every unit, so it is always offered.
+export function progressionUnits(
+  units: VocabularyUnit[],
+  progress: LearningProgress,
+): VocabularyUnit[] {
+  const upcoming = new Set<string>()
+  for (const book of books) {
+    const next = units
+      .filter(
+        (unit) =>
+          unit.book === book &&
+          typeof unit.unit === 'number' &&
+          unit.reviewStatus === 'approved' &&
+          !isUnitCompleted(unit, progress),
+      )
+      .sort((a, b) => Number(a.unit) - Number(b.unit))[0]
+    if (next) upcoming.add(unitKey(next))
+  }
+  return units.filter(
+    (unit) =>
+      unit.unit === 'irregular-verbs' ||
+      upcoming.has(unitKey(unit)) ||
+      isUnitCompleted(unit, progress),
+  )
+}
+
 export function isVocabularyLibrary(
   value: unknown,
 ): value is VocabularyLibrary {

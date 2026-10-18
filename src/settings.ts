@@ -2,18 +2,27 @@ import { books } from './vocabulary'
 import type { Book } from './vocabulary'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
+export type UnitProgression = 'all' | 'completed-and-next'
 
 export interface Settings {
   schemaVersion: 1
   theme: ThemePreference
   books: Book[]
+  // Which units kid space shows; parent space always shows every unit.
+  progression: UnitProgression
 }
 
 export const settingsStorageKey = 'ourlingo.settings.v1'
 export const themePreferences: ThemePreference[] = ['system', 'light', 'dark']
+export const unitProgressions: UnitProgression[] = ['all', 'completed-and-next']
 
 export function defaultSettings(): Settings {
-  return { schemaVersion: 1, theme: 'system', books: [...books] }
+  return {
+    schemaVersion: 1,
+    theme: 'system',
+    books: [...books],
+    progression: 'all',
+  }
 }
 
 // Keeps known values, drops unknown books, and falls back to defaults so a
@@ -27,10 +36,16 @@ export function normalizeSettings(value: unknown): Settings {
     : defaults.theme
   const savedBooks = Array.isArray(saved.books) ? saved.books : []
   const preferred = books.filter((book) => savedBooks.includes(book))
+  const progression = unitProgressions.includes(
+    saved.progression as UnitProgression,
+  )
+    ? (saved.progression as UnitProgression)
+    : defaults.progression
   return {
     schemaVersion: 1,
     theme,
     books: preferred.length ? preferred : defaults.books,
+    progression,
   }
 }
 

@@ -1445,3 +1445,66 @@ test('settings choose a theme and preferred books that persist after reload', as
   await page.getByRole('button', { name: 'My units', exact: false }).click()
   await expect(unitCards).toHaveCount(31)
 })
+
+test('completed + next shows finished units for revision and unlocks the next unit in kid space only', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ entries }) => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem(
+        'ourlingo.settings.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          theme: 'system',
+          books: ['MORE! 1'],
+          progression: 'completed-and-next',
+        }),
+      )
+      localStorage.setItem(
+        'ourlingo.learning.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          records: entries.map((entry) => ({
+            book: 'MORE! 1',
+            unit: 1,
+            english: entry.english,
+            german: entry.german,
+            correctAttempts: 3,
+            incorrectAttempts: 0,
+            correctStreak: 3,
+            lastPracticedAt: '2026-10-18T10:00:00.000Z',
+          })),
+        }),
+      )
+    },
+    { entries: unit.entries },
+  )
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const unitCards = page.locator('.unit-card')
+  await expect(unitCards).toHaveCount(2)
+  const unitOne = unitCards.filter({ hasText: 'Unit 1' })
+  await expect(unitOne.getByText('Completed', { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
+  ).toBeEnabled()
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 1 Unit 2', exact: true }),
+  ).toBeEnabled()
+  await expect(page.getByText('Know every word of a unit')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await expect(unitCards).toHaveCount(15)
+  await page.getByRole('button', { name: 'Kid space', exact: true }).click()
+  await expect(unitCards).toHaveCount(2)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('radio', { name: 'All units', exact: true }).check()
+  await page.getByRole('button', { name: 'My units', exact: false }).click()
+  await expect(unitCards).toHaveCount(15)
+  await expect(page.getByText('Know every word of a unit')).toHaveCount(0)
+  await page.reload()
+  await expect(unitCards).toHaveCount(15)
+})

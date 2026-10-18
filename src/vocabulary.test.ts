@@ -8,16 +8,19 @@ import {
   createRound,
   isCorrectAnswer,
   isLearningProgress,
+  isUnitCompleted,
   isVocabularyLibrary,
   isVocabularyUnit,
   learningProgressStorageKey,
   mergeBundledUnits,
+  progressionUnits,
   unitKey,
   unitLabel,
   updateLearningProgress,
   upsertUnit,
   validateEntries,
 } from './vocabulary.ts'
+import type { LearningProgress, VocabularyUnit } from './vocabulary.ts'
 
 const unit: unknown = JSON.parse(
   readFileSync(
@@ -581,4 +584,83 @@ test('learning progress tracks first attempts and resets mastery streaks after a
   assert.equal(isLearningProgress(missedRound), true)
   assert.equal(isLearningProgress({ schemaVersion: 1, records: [{ ...attempt }] }), false)
   assert.equal(learningProgressStorageKey, 'ourlingo.learning.v1')
+})
+
+test('a unit is completed when every word is known and progression offers the next unit', () => {
+  const makeUnit = (
+    book: VocabularyUnit['book'],
+    number: VocabularyUnit['unit'],
+    reviewStatus: VocabularyUnit['reviewStatus'] = 'approved',
+  ): VocabularyUnit => ({
+    schemaVersion: 1,
+    book,
+    unit: number,
+    title: `Unit ${number}`,
+    source: 'Test',
+    reviewStatus,
+    entries: [
+      { english: `${book} ${number} a`, german: 'a', example: null },
+      { english: `${book} ${number} b`, german: 'b', example: null },
+    ],
+  })
+  const know = (
+    progress: LearningProgress,
+    unit: VocabularyUnit,
+    rounds = 3,
+  ): LearningProgress => {
+    let next = progress
+    for (let round = 0; round < rounds; round += 1)
+      next = updateLearningProgress(
+        next,
+        unit,
+        unit.entries.map((entry) => ({ ...entry, correct: true })),
+        '2026-10-18T10:00:00.000Z',
+      )
+    return next
+  }
+  const one = makeUnit('MORE! 1', 1)
+  const two = makeUnit('MORE! 1', 2)
+  const three = makeUnit('MORE! 1', 3)
+  const pending = makeUnit('MORE! 1', 4, 'pending')
+  const five = makeUnit('MORE! 1', 5)
+  const otherBook = makeUnit('MORE! 2', 1)
+  const verbs = makeUnit('MORE! 2', 'irregular-verbs')
+  const units = [three, five, pending, two, one, otherBook, verbs]
+  const empty: LearningProgress = { schemaVersion: 1, records: [] }
+  const keys = (progress: LearningProgress) =>
+    progressionUnits(units, progress).map(unitKey)
+
+  assert.deepEqual(keys(empty), ['MORE! 1:1', 'MORE! 2:1', 'MORE! 2:irregular-verbs'])
+
+  const almost = know(empty, one, 2)
+  assert.equal(isUnitCompleted(one, almost), false)
+  assert.deepEqual(keys(almost), ['MORE! 1:1', 'MORE! 2:1', 'MORE! 2:irregular-verbs'])
+
+  const firstDone = know(empty, one)
+  assert.equal(isUnitCompleted(one, firstDone), true)
+  assert.deepEqual(keys(firstDone), [
+    'MORE! 1:2',
+    'MORE! 1:1',
+    'MORE! 2:1',
+    'MORE! 2:irregular-verbs',
+  ])
+
+  const missed = updateLearningProgress(
+    firstDone,
+    one,
+    [{ ...one.entries[0], correct: false }],
+    '2026-10-18T11:00:00.000Z',
+  )
+  assert.equal(isUnitCompleted(one, missed), false)
+
+  const throughThree = know(know(firstDone, two), three)
+  assert.deepEqual(keys(throughThree), [
+    'MORE! 1:3',
+    'MORE! 1:5',
+    'MORE! 1:2',
+    'MORE! 1:1',
+    'MORE! 2:1',
+    'MORE! 2:irregular-verbs',
+  ])
+  assert.equal(isUnitCompleted({ ...one, entries: [] }, throughThree), false)
 })
