@@ -1,6 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Fraunces:wght@500;550;600&display=swap');
 :root {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans Variable', 'DM Sans', sans-serif;
   color: #243c35;
   background: #f7f9f8;
   font-synthesis: none;
@@ -15,7 +14,7 @@
   --line: #e5ebe7;
   --peach: #f9e9e2;
   --yellow: #f9f1d9;
-  --heading: 'Fraunces', Georgia, serif;
+  --heading: 'Fraunces Variable', 'Fraunces', Georgia, serif;
   letter-spacing: 0;
   color-scheme: light;
   /* Space reserved for system bars when Android draws the app edge-to-edge. */

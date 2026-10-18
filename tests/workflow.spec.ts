@@ -1773,3 +1773,26 @@ test('the button to go on stays visible on a phone during long description board
     page.getByRole('button', { name: 'Check answer', exact: true }),
   ).toBeInViewport()
 })
+
+test('the app only loads its own files and contacts no other servers', async ({
+  page,
+}) => {
+  const external: string[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (!['localhost', '127.0.0.1'].includes(url.hostname) && url.protocol !== 'data:')
+      external.push(request.url())
+  })
+  await page.goto('/')
+  await expect(page.locator('.unit-card')).toHaveCount(59)
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.locator('.question-word')).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  expect(external).toEqual([])
+  expect(
+    await page.evaluate(() => document.fonts.check('16px "DM Sans Variable"')),
+  ).toBe(true)
+})
