@@ -1093,7 +1093,19 @@ export default function OurLingo() {
               </h1>
               <p>
                 {view === 'library'
-                  ? `${preferredBooks.join(' + ')} · English / Deutsch`
+                  ? (
+                      <>
+                        {preferredBooks.map((book, index) => (
+                          <span key={book}>
+                            {index > 0 && ' + '}
+                            <span className={`book-name book-${bookNumber(book)}`}>
+                              {book}
+                            </span>
+                          </span>
+                        ))}
+                        {' · English / Deutsch'}
+                      </>
+                    )
                   : view === 'report'
                     ? 'Progress saved on this device'
                     : view === 'settings'
@@ -1164,7 +1176,7 @@ export default function OurLingo() {
                       {(['all', ...preferredBooks] as const).map((book) => (
                         <label
                           key={book}
-                          className={activeBookFilter === book ? 'selected' : ''}
+                          className={`${activeBookFilter === book ? 'selected' : ''} ${book === 'all' ? 'all-books' : `book-${bookNumber(book)}`}`}
                         >
                           <input
                             type="radio"
@@ -1173,6 +1185,16 @@ export default function OurLingo() {
                             checked={activeBookFilter === book}
                             onChange={() => setBookFilter(book)}
                           />
+                          <span className="book-dots" aria-hidden="true">
+                            {(book === 'all' ? preferredBooks : [book]).map(
+                              (dotBook) => (
+                                <span
+                                  key={dotBook}
+                                  className={`book-${bookNumber(dotBook)}`}
+                                />
+                              ),
+                            )}
+                          </span>
                           {book === 'all' ? 'All books' : book}
                         </label>
                       ))}
