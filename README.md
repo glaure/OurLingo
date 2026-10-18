@@ -7,6 +7,7 @@ For the Windows workspace transition and proposed Tauri v2 packaging work, see [
 ## Current Features
 
 - Open in kid space by default, with a unit library and practice for approved units only.
+- On first start, a welcome window asks which MORE! book(s) the family uses (several can be ticked) and notes that this can be changed later in Settings. Kid space then shows completed units plus the next one of each chosen book; Settings > Units can switch to all units.
 - Switch to parent space to create, review, approve or delete units in MORE! 1 to MORE! 4.
 - Select units or filter by book; vocabulary and answer choices stay separate for each unit.
 - Review user-photo transcriptions: MORE! 1 has 42/41/31/42/43/38/28/27/40/44/38 entries in Units 1-11; visible portions of Units 12-15 add 65/41/44/23 entries. MORE! 2 has 45/39/33/35/37/35/30/33/31/26/29/33/33/38/24 entries in Units 1-15.

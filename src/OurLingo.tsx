@@ -65,6 +65,7 @@ import type {
 } from './vocabulary'
 import {
   applyTheme,
+  hasSavedSettings,
   loadSettings,
   saveSettings,
   themePreferences,
@@ -212,6 +213,8 @@ export default function OurLingo() {
   const [space, setSpace] = useState<'kid' | 'parent'>('kid')
   const [view, setView] = useState<View>('library')
   const [settings, setSettings] = useState<Settings>(loadSettings)
+  const [firstStart, setFirstStart] = useState(() => !hasSavedSettings())
+  const [firstBooks, setFirstBooks] = useState<Book[]>([])
   const [bookFilter, setBookFilter] = useState<'all' | Book>('all')
   const [showCreator, setShowCreator] = useState(false)
   const [newBook, setNewBook] = useState<Book>('MORE! 1')
@@ -691,6 +694,16 @@ export default function OurLingo() {
         item === book ? !selected : preferredBooks.includes(item),
       ),
     })
+  }
+
+  function finishFirstStart() {
+    if (!firstBooks.length) return
+    updateSettings({
+      ...settings,
+      books: books.filter((book) => firstBooks.includes(book)),
+    })
+    setBookFilter('all')
+    setFirstStart(false)
   }
 
   function goTo(next: View) {
@@ -2259,6 +2272,61 @@ export default function OurLingo() {
           </footer>
         </main>
       </div>
+      {firstStart && (
+        <div className="welcome-backdrop">
+          <section
+            className="welcome"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="welcome-title"
+          >
+            <span className="practice-emblem">
+              <BookOpen size={30} />
+            </span>
+            <h2 id="welcome-title">Welcome to OurLingo!</h2>
+            <p>Which MORE! book do you use? You can pick more than one.</p>
+            <div className="book-choices">
+              {books.map((book) => {
+                const checked = firstBooks.includes(book)
+                return (
+                  <label
+                    key={book}
+                    className={checked ? 'book-choice selected' : 'book-choice'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setFirstBooks((previous) =>
+                          checked
+                            ? previous.filter((item) => item !== book)
+                            : [...previous, book],
+                        )
+                      }
+                    />
+                    <span className={`book-spine book-${bookNumber(book)}`}>
+                      {bookNumber(book)}
+                    </span>
+                    {book}
+                  </label>
+                )
+              })}
+            </div>
+            <p className="welcome-note">
+              <SettingsIcon size={15} />
+              You can change this later in Settings.
+            </p>
+            <button
+              className="button primary"
+              disabled={!firstBooks.length}
+              onClick={finishFirstStart}
+            >
+              Let's start
+              <ArrowRight size={17} />
+            </button>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

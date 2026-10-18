@@ -25,6 +25,26 @@ const moreOneFixtures = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(
     ) as VocabularyUnit,
 )
 
+// Most tests use a device that is already set up and shows every unit; tests
+// tagged @first-start begin without saved settings.
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.tags.includes('@first-start')) return
+  await page.addInitScript(() => {
+    if (localStorage.getItem('ourlingo.settings.v1')) return
+    const books = ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4']
+    localStorage.setItem(
+      'ourlingo.settings.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        theme: 'system',
+        books,
+        knownBooks: books,
+        progression: 'all',
+      }),
+    )
+  })
+})
+
 test('MORE! 2 Irregular Verbs supports phone review, practice, progress and permanent deletion', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
   await page.goto('/')
@@ -1668,4 +1688,43 @@ test('practice setup shows unit progress, keeps Start visible on a phone and lea
     .click()
   await page.locator('.crumb-link').click()
   await expect(page.locator('.unit-card')).toHaveCount(59)
+})
+
+test('first start asks for the book, mentions Settings and defaults to completed + next', { tag: '@first-start' }, async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const welcome = page.getByRole('dialog', { name: 'Welcome to OurLingo!' })
+  await expect(welcome).toBeVisible()
+  await expect(welcome).toContainText('You can change this later in Settings.')
+  const start = welcome.getByRole('button', { name: "Let's start" })
+  await expect(start).toBeDisabled()
+  await welcome.getByRole('checkbox', { name: 'MORE! 2' }).check()
+  await expect(start).toBeEnabled()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+  await start.click()
+  await expect(welcome).toHaveCount(0)
+  await expect(page.getByText('MORE! 2 · English / Deutsch')).toBeVisible()
+  await expect(page.locator('.unit-card')).toHaveCount(2)
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 2 Irregular Verbs', exact: true }),
+  ).toBeVisible()
+
+  await page.reload()
+  await expect(page.locator('.unit-card')).toHaveCount(2)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(
+    page.getByRole('radio', { name: 'Completed + next', exact: true }),
+  ).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'MORE! 2' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'MORE! 1' })).not.toBeChecked()
 })

@@ -8,7 +8,7 @@ test('settings default to the system theme and every book', () => {
     schemaVersion: 1,
     theme: 'system',
     books: [...books],
-    progression: 'all',
+    progression: 'completed-and-next',
   })
   assert.deepEqual(normalizeSettings(null), defaultSettings())
   assert.deepEqual(normalizeSettings('broken'), defaultSettings())
@@ -25,7 +25,7 @@ test('settings keep a valid theme and preferred books in book order', () => {
       schemaVersion: 1,
       theme: 'dark',
       books: ['MORE! 1', 'MORE! 2'],
-      progression: 'all',
+      progression: 'completed-and-next',
     },
   )
   assert.deepEqual(

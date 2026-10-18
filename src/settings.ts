@@ -21,7 +21,7 @@ export function defaultSettings(): Settings {
     schemaVersion: 1,
     theme: 'system',
     books: [...books],
-    progression: 'all',
+    progression: 'completed-and-next',
   }
 }
 
@@ -57,6 +57,15 @@ export function normalizeSettings(value: unknown): Settings {
     theme,
     books: preferred.length ? preferred : defaults.books,
     progression,
+  }
+}
+
+// No saved settings means the app has not been set up on this device yet.
+export function hasSavedSettings(): boolean {
+  try {
+    return localStorage.getItem(settingsStorageKey) !== null
+  } catch {
+    return false
   }
 }
 
