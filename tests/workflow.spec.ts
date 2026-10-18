@@ -127,7 +127,7 @@ test('review, search, edit, approve and reload saved vocabulary', async ({
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await openReview(page)
-  await expect(page.getByText('v0.2.1', { exact: true })).toBeVisible()
+  await expect(page.getByText('v0.2.2', { exact: true })).toBeVisible()
   await expect(page.locator('.vocabulary-row')).toHaveCount(42)
   await expect(
     page.getByRole('button', { name: 'Practice', exact: true }),
