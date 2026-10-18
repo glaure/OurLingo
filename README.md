@@ -164,6 +164,15 @@ To install it on a connected Android device with USB debugging enabled, run:
 
 Use `adb devices -l` to confirm a device is connected. Test the packaged app with Wi-Fi and mobile data disabled to verify bundled units load offline. The Android WebView has separate localStorage from the browser, and there is no library import/restore yet; use test data in the native app until a full-library backup and restore path exists. Windows desktop packaging can follow later; this machine already has the documented C++ Build Tools and WebView2 prerequisites. See the [official Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) if a toolchain update is needed.
 
+## Play Store Release
+
+Release builds are Android App Bundles for arm64 and armv7, signed with the upload key registered in the Play Console. Keep the key outside the repository (`*.jks` is ignored by git) and back it up; Google only accepts uploads signed with it.
+
+1. Raise the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (and their lock files). Tauri derives the Play version code from it, e.g. `0.2.0` becomes `2000`; every upload needs a higher code.
+2. Place the key at `~/OurLingo-signing/ourlingo-upload.jks` on Linux or `%USERPROFILE%\OurLingo-signing\ourlingo-upload.jks` on Windows.
+3. Run `scripts/build-android-release.sh` on Linux or `scripts\build-android-release.ps1` on Windows. Both ask for the keystore and key passwords, build the bundle, verify its signature and copy it to `Downloads/OurLingo-release.aab` with its SHA-256 checksum.
+4. Upload `OurLingo-release.aab` in the Play Console.
+
 ## Data and Limitations
 
 The bundled datasets under `public/data/` cover MORE! 1, Units 1-15, MORE! 2, Units 1-15 plus Irregular Verbs, and MORE! 3 and MORE! 4, Units 1-14 each. They are manual transcriptions of user-provided photos, not automated OCR results. These 59 lessons are approved for immediate practice. Parent-created units still start pending until approved. Existing saved edits are preserved when approval is migrated; deleted bundled lessons stay deleted.
