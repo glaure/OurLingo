@@ -2366,10 +2366,18 @@ progress::-moz-progress-bar {
   flex: 1;
   margin: 0;
 }
+/* During practice the unit is already named in the breadcrumb, so the big
+   heading gives way to the exercise on every screen size. */
+.practice-view .page-heading {
+  display: none;
+}
+.practice-setup .start-button {
+  position: sticky;
+  bottom: calc(10px + var(--safe-bottom));
+  z-index: 5;
+  box-shadow: 0 6px 18px #1d2f2533;
+}
 @media (max-width: 600px) {
-  .practice-view .page-heading {
-    display: none;
-  }
   .practice-view .practice-section {
     min-height: 0;
     padding-top: 0;
@@ -2402,11 +2410,7 @@ progress::-moz-progress-bar {
     min-height: 66px;
   }
   .practice-setup .start-button {
-    position: sticky;
-    bottom: calc(10px + var(--safe-bottom));
-    z-index: 5;
     margin-top: 18px;
-    box-shadow: 0 6px 18px #1d2f2533;
   }
 }
 :where(:root[data-theme='dark']) .unit-stats {
@@ -2509,20 +2513,19 @@ progress::-moz-progress-bar {
     padding-block: 8px;
   }
 }
-/* On phones the button to go on stays on screen, even when a board or card is taller than the screen. */
-@media (max-width: 600px) {
-  .practice-section .answer-button {
-    position: sticky;
-    bottom: calc(10px + var(--safe-bottom));
-    z-index: 5;
-    box-shadow: 0 6px 18px #1d2f2533;
-  }
-  .practice-section .answer-button:disabled {
-    opacity: 1;
-    background: var(--book-soft);
-    color: var(--book-ink);
-    box-shadow: 0 6px 18px #1d2f251f;
-  }
+/* The button to go on stays on screen, even when a board or card is taller
+   than the screen (phones, and tablets held sideways). */
+.practice-section .answer-button {
+  position: sticky;
+  bottom: calc(10px + var(--safe-bottom));
+  z-index: 5;
+  box-shadow: 0 6px 18px #1d2f2533;
+}
+.practice-section .answer-button:disabled {
+  opacity: 1;
+  background: var(--book-soft);
+  color: var(--book-ink);
+  box-shadow: 0 6px 18px #1d2f251f;
 }
 /* During practice on narrow screens the menu rows give way to the board;
    the current unit sits next to the logo instead. */

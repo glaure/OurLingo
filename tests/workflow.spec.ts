@@ -1796,3 +1796,25 @@ test('the app only loads its own files and contacts no other servers', async ({
     await page.evaluate(() => document.fonts.check('16px "DM Sans Variable"')),
   ).toBe(true)
 })
+
+test('on a tablet held sideways the practice buttons stay visible', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true })
+    .click()
+  await expect(page.getByRole('heading', { name: 'A little practice' })).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: 'Start practice' }),
+  ).toBeInViewport()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page
+    .getByRole('radio', { name: 'English + Description', exact: true })
+    .check()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Next board', exact: true }),
+  ).toBeInViewport()
+})
