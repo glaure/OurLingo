@@ -2556,3 +2556,21 @@ progress::-moz-progress-bar {
     font-weight: 600;
   }
 }
+/* Narrow phones (around 360px): keep the menu on one line and the question
+   options on two lines. */
+@media (max-width: 400px) {
+  .sidebar nav {
+    gap: 6px;
+  }
+  .nav-link {
+    gap: 6px;
+    padding-inline: 4px;
+  }
+  .nav-link > svg:last-child:not(:first-child) {
+    display: none;
+  }
+  .direction-field:not(.mode-field) .segmented label {
+    font-size: 14px;
+    padding-inline: 6px;
+  }
+}
