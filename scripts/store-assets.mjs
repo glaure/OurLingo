@@ -1,6 +1,6 @@
-// Creates the Google Play store graphics in store-assets/:
-// phone screenshots (1080x1920) from the real app and the feature graphic
-// (1024x500). Run with: node scripts/store-assets.mjs
+// Creates the Google Play store graphics in store-assets/: screenshots from
+// the real app for phones (1080x1920), 7-inch tablets (1080x1920) and 10-inch
+// tablets (2560x1440), and the feature graphic (1024x500). Run with: node scripts/store-assets.mjs
 import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
@@ -36,19 +36,12 @@ const progress = {
   ],
 }
 
-const server = await createServer({
-  root,
-  server: { port: 5182, strictPort: true },
-  logLevel: 'error',
-})
-await server.listen()
-const base = 'http://localhost:5182/'
-const browser = await chromium.launch()
-
-try {
+// Takes the five store screenshots for one device type.
+async function captureScreens(folder, viewport, deviceScaleFactor) {
+  mkdirSync(`${out}/${folder}`, { recursive: true })
   const page = await browser.newPage({
-    viewport: { width: 360, height: 640 },
-    deviceScaleFactor: 3,
+    viewport,
+    deviceScaleFactor,
     colorScheme: 'light',
   })
   await page.addInitScript(
@@ -72,7 +65,7 @@ try {
   const shot = async (name) => {
     await page.evaluate(() => document.fonts.ready)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: `${out}/${name}.png` })
+    await page.screenshot({ path: `${out}/${folder}/${name}.png` })
   }
   const backToSetup = async () => {
     page.once('dialog', (dialog) => dialog.accept())
@@ -149,8 +142,24 @@ try {
   await page.locator('.result-stars').waitFor()
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.waitForTimeout(500)
-  await page.screenshot({ path: `${out}/05-results.png` })
+  await page.screenshot({ path: `${out}/${folder}/05-results.png` })
   await page.close()
+}
+
+const server = await createServer({
+  root,
+  server: { port: 5182, strictPort: true },
+  logLevel: 'error',
+})
+await server.listen()
+const base = 'http://localhost:5182/'
+const browser = await chromium.launch()
+
+try {
+  // Phone 9:16, 7-inch tablet portrait 9:16, 10-inch tablet landscape 16:9.
+  await captureScreens('phone', { width: 360, height: 640 }, 3)
+  await captureScreens('tablet-7', { width: 576, height: 1024 }, 1.875)
+  await captureScreens('tablet-10', { width: 1280, height: 720 }, 2)
 
   // Feature graphic in the style of the app icon.
   const graphic = await browser.newPage({
