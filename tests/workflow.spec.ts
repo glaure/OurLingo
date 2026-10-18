@@ -343,7 +343,7 @@ test('kid space is the default, migration preserves approved edits, and parent c
   const migrated = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(migrated.units).toHaveLength(31)
+  expect(migrated.units).toHaveLength(59)
   expect(migrated.units[0].entries[0].german).toBe('geben; schenken')
   expect(migrated.units[0].reviewStatus).toBe('approved')
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
@@ -400,7 +400,7 @@ test('create units in both books, keep their words separate, and practise the se
     await expect(page.getByRole('status')).toContainText('approved and saved')
   }
   await page.getByRole('button', { name: 'Kid space', exact: true }).click()
-  await expect(page.locator('.unit-card')).toHaveCount(33)
+  await expect(page.locator('.unit-card')).toHaveCount(61)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
@@ -424,7 +424,7 @@ test('create units in both books, keep their words separate, and practise the se
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('ourlingo.library.v1')!),
   )
-  expect(stored.units).toHaveLength(33)
+  expect(stored.units).toHaveLength(61)
   expect(
     stored.units.find(
       (item: VocabularyUnit) => item.book === 'MORE! 1' && item.unit === 1,
@@ -434,7 +434,7 @@ test('create units in both books, keep their words separate, and practise the se
   await expect(
     page.getByRole('region', { name: 'Kid space', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('.unit-card')).toHaveCount(33)
+  await expect(page.locator('.unit-card')).toHaveCount(61)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 16', exact: true }),
   ).toBeEnabled()
@@ -451,7 +451,7 @@ test('duplicate units cannot overwrite data and unsaved review changes require c
   await page.getByLabel('Unit number', { exact: true }).fill('1')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('already exists')
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
   await page.getByLabel('Unit number', { exact: true }).fill('16')
   await page.getByRole('button', { name: 'Create unit', exact: true }).click()
   await page.getByRole('button', { name: 'Add a word or phrase' }).click()
@@ -483,38 +483,12 @@ test('confirmed unit deletion persists and an empty library does not restore del
   await page
     .getByRole('button', { name: 'Delete MORE! 1 Unit 1', exact: true })
     .click()
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
+  const unitsPerBook = { 'MORE! 1': 15, 'MORE! 2': 15, 'MORE! 3': 14, 'MORE! 4': 14 }
   for (const name of [
-    'MORE! 1 Unit 1',
-    'MORE! 1 Unit 2',
-    'MORE! 1 Unit 3',
-    'MORE! 1 Unit 4',
-    'MORE! 1 Unit 5',
-    'MORE! 1 Unit 6',
-    'MORE! 1 Unit 7',
-    'MORE! 1 Unit 8',
-    'MORE! 1 Unit 9',
-    'MORE! 1 Unit 10',
-    'MORE! 1 Unit 11',
-    'MORE! 1 Unit 12',
-    'MORE! 1 Unit 13',
-    'MORE! 1 Unit 14',
-    'MORE! 1 Unit 15',
-    'MORE! 2 Unit 1',
-    'MORE! 2 Unit 2',
-    'MORE! 2 Unit 3',
-    'MORE! 2 Unit 4',
-    'MORE! 2 Unit 5',
-    'MORE! 2 Unit 6',
-    'MORE! 2 Unit 7',
-    'MORE! 2 Unit 8',
-    'MORE! 2 Unit 9',
-    'MORE! 2 Unit 10',
-    'MORE! 2 Unit 11',
-    'MORE! 2 Unit 12',
-    'MORE! 2 Unit 13',
-    'MORE! 2 Unit 14',
-    'MORE! 2 Unit 15',
+    ...Object.entries(unitsPerBook).flatMap(([book, count]) =>
+      Array.from({ length: count }, (_, index) => `${book} Unit ${index + 1}`),
+    ),
     'MORE! 2 Irregular Verbs',
   ]) {
     page.once('dialog', (dialog) => dialog.accept())
@@ -673,7 +647,7 @@ test('previously installed bundled units are approved on upgrade', async ({
     )
   }, allUnits)
   await page.goto('/')
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
   for (const bundled of allUnits) {
     await expect(
       page.getByRole('button', {
@@ -759,7 +733,7 @@ test('an unavailable Unit 2 download leaves saved Unit 1 available', async ({
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(30)
+  await expect(page.locator('.unit-card')).toHaveCount(58)
 })
 
 for (const fixture of moreOneFixtures) {
@@ -992,7 +966,7 @@ test('MORE! 2 additions preserve edited vocabulary and approval in an existing l
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
   ).toBeEnabled()
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await page
     .getByRole('button', { name: 'Review MORE! 2 Unit 1', exact: true })
@@ -1404,7 +1378,7 @@ test('settings choose a theme and preferred books that persist after reload', as
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   const unitCards = page.locator('.unit-card')
-  await expect(unitCards).toHaveCount(31)
+  await expect(unitCards).toHaveCount(59)
   const theme = () =>
     page.evaluate(() => ({
       name: document.documentElement.dataset.theme,
@@ -1419,6 +1393,8 @@ test('settings choose a theme and preferred books that persist after reload', as
   const moreOne = page.getByRole('checkbox', { name: 'MORE! 1' })
   const moreTwo = page.getByRole('checkbox', { name: 'MORE! 2' })
   await moreOne.uncheck()
+  await page.getByRole('checkbox', { name: 'MORE! 3' }).uncheck()
+  await page.getByRole('checkbox', { name: 'MORE! 4' }).uncheck()
   await expect(moreTwo).toBeChecked()
   await expect(moreTwo).toBeDisabled()
 
@@ -1459,6 +1435,7 @@ test('completed + next shows finished units for revision and unlocks the next un
           schemaVersion: 1,
           theme: 'system',
           books: ['MORE! 1'],
+          knownBooks: ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'],
           progression: 'completed-and-next',
         }),
       )
@@ -1601,7 +1578,7 @@ test('saved libraries receive suggested descriptions without replacing cleared o
     },
   )
   await page.goto('/')
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
   const saved = await page.evaluate(
     () =>
       JSON.parse(localStorage.getItem('ourlingo.library.v1')!).units.find(
@@ -1685,10 +1662,10 @@ test('practice setup shows unit progress, keeps Start visible on a phone and lea
     page.getByRole('button', { name: 'Start practice' }),
   ).toBeInViewport()
   await page.getByRole('button', { name: 'My units', exact: true }).last().click()
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
   await page
     .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
     .click()
   await page.locator('.crumb-link').click()
-  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await expect(page.locator('.unit-card')).toHaveCount(59)
 })

@@ -738,12 +738,13 @@ test('description practice uses English answers, shared descriptions and bundled
   assert.equal(isVocabularyLibrary({ ...merged, describedUnitKeys: [1] }), false)
 })
 
-test('every bundled word except Irregular Verbs has a suggested description', () => {
+test('every bundled unit is valid and every word except Irregular Verbs has a suggested description', () => {
   for (const { file } of bundledUnitFiles) {
     const data = JSON.parse(
       readFileSync(new URL(`../public/data/${file}`, import.meta.url), 'utf8'),
     ) as VocabularyUnit
     assert.ok(isVocabularyUnit(data), file)
+    assert.equal(validateEntries(data.entries), null, file)
     for (const entry of data.entries) {
       if (data.unit === 'irregular-verbs') {
         assert.equal(entry.description, undefined, file)

@@ -25,17 +25,28 @@ export function defaultSettings(): Settings {
   }
 }
 
+// Books that existed before settings remembered which books they knew about.
+const booksBeforeKnownBooks = ['MORE! 1', 'MORE! 2']
+
 // Keeps known values, drops unknown books, and falls back to defaults so a
-// damaged or older settings entry never hides the whole library.
+// damaged or older settings entry never hides the whole library. Books added
+// to the app after the settings were saved start out selected.
 export function normalizeSettings(value: unknown): Settings {
   const defaults = defaultSettings()
   if (!value || typeof value !== 'object') return defaults
-  const saved = value as Partial<Record<keyof Settings, unknown>>
+  const saved = value as Partial<Record<keyof Settings | 'knownBooks', unknown>>
   const theme = themePreferences.includes(saved.theme as ThemePreference)
     ? (saved.theme as ThemePreference)
     : defaults.theme
   const savedBooks = Array.isArray(saved.books) ? saved.books : []
-  const preferred = books.filter((book) => savedBooks.includes(book))
+  const knownBooks = Array.isArray(saved.knownBooks)
+    ? saved.knownBooks
+    : booksBeforeKnownBooks
+  const preferred = books.some((book) => savedBooks.includes(book))
+    ? books.filter(
+        (book) => savedBooks.includes(book) || !knownBooks.includes(book),
+      )
+    : []
   const progression = unitProgressions.includes(
     saved.progression as UnitProgression,
   )
@@ -60,7 +71,10 @@ export function loadSettings(): Settings {
 
 export function saveSettings(settings: Settings): boolean {
   try {
-    localStorage.setItem(settingsStorageKey, JSON.stringify(settings))
+    localStorage.setItem(
+      settingsStorageKey,
+      JSON.stringify({ ...settings, knownBooks: books }),
+    )
     return true
   } catch {
     return false

@@ -10,7 +10,7 @@ export interface Entry {
 }
 
 // Add new MORE! books here; settings, filters and unit creation follow this list.
-export const books = ['MORE! 1', 'MORE! 2'] as const
+export const books = ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'] as const
 export type Book = (typeof books)[number]
 
 export function bookNumber(book: Book): string {
@@ -61,6 +61,34 @@ export const bundledUnitFiles = [
   { book: 'MORE! 2', unit: 14, file: 'more-2-unit-14.json' },
   { book: 'MORE! 2', unit: 15, file: 'more-2-unit-15.json' },
   { book: 'MORE! 2', unit: 'irregular-verbs', file: 'more-2-irregular-verbs.json' },
+  { book: 'MORE! 3', unit: 1, file: 'more-3-unit-1.json' },
+  { book: 'MORE! 3', unit: 2, file: 'more-3-unit-2.json' },
+  { book: 'MORE! 3', unit: 3, file: 'more-3-unit-3.json' },
+  { book: 'MORE! 3', unit: 4, file: 'more-3-unit-4.json' },
+  { book: 'MORE! 3', unit: 5, file: 'more-3-unit-5.json' },
+  { book: 'MORE! 3', unit: 6, file: 'more-3-unit-6.json' },
+  { book: 'MORE! 3', unit: 7, file: 'more-3-unit-7.json' },
+  { book: 'MORE! 3', unit: 8, file: 'more-3-unit-8.json' },
+  { book: 'MORE! 3', unit: 9, file: 'more-3-unit-9.json' },
+  { book: 'MORE! 3', unit: 10, file: 'more-3-unit-10.json' },
+  { book: 'MORE! 3', unit: 11, file: 'more-3-unit-11.json' },
+  { book: 'MORE! 3', unit: 12, file: 'more-3-unit-12.json' },
+  { book: 'MORE! 3', unit: 13, file: 'more-3-unit-13.json' },
+  { book: 'MORE! 3', unit: 14, file: 'more-3-unit-14.json' },
+  { book: 'MORE! 4', unit: 1, file: 'more-4-unit-1.json' },
+  { book: 'MORE! 4', unit: 2, file: 'more-4-unit-2.json' },
+  { book: 'MORE! 4', unit: 3, file: 'more-4-unit-3.json' },
+  { book: 'MORE! 4', unit: 4, file: 'more-4-unit-4.json' },
+  { book: 'MORE! 4', unit: 5, file: 'more-4-unit-5.json' },
+  { book: 'MORE! 4', unit: 6, file: 'more-4-unit-6.json' },
+  { book: 'MORE! 4', unit: 7, file: 'more-4-unit-7.json' },
+  { book: 'MORE! 4', unit: 8, file: 'more-4-unit-8.json' },
+  { book: 'MORE! 4', unit: 9, file: 'more-4-unit-9.json' },
+  { book: 'MORE! 4', unit: 10, file: 'more-4-unit-10.json' },
+  { book: 'MORE! 4', unit: 11, file: 'more-4-unit-11.json' },
+  { book: 'MORE! 4', unit: 12, file: 'more-4-unit-12.json' },
+  { book: 'MORE! 4', unit: 13, file: 'more-4-unit-13.json' },
+  { book: 'MORE! 4', unit: 14, file: 'more-4-unit-14.json' },
 ] as const
 
 export interface VocabularyLibrary {
