@@ -19,12 +19,15 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Settings as SettingsIcon,
   Sparkles,
   Trash2,
   Users,
   X,
 } from 'lucide-react'
 import {
+  bookNumber,
+  books,
   bundledUnitFiles,
   createAnswerChoices,
   createMatchingRound,
@@ -45,18 +48,33 @@ import {
 } from './vocabulary'
 import type {
   AnswerChoice,
+  Book,
   Entry,
   LearningProgress,
   VocabularyLibrary,
   VocabularyUnit,
 } from './vocabulary'
+import {
+  applyTheme,
+  loadSettings,
+  saveSettings,
+  themePreferences,
+  watchSystemTheme,
+} from './settings'
+import type { Settings, ThemePreference } from './settings'
 import './OurLingo.css'
 
+type View = 'library' | 'review' | 'practice' | 'report' | 'settings'
 type Direction = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
 declare const __APP_VERSION__: string
 const matchingPasses = 3
+const themeLabels: Record<ThemePreference, string> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+}
 
 function loadLearningProgress(): LearningProgress {
   const empty: LearningProgress = { schemaVersion: 1, records: [] }
@@ -81,14 +99,11 @@ export default function OurLingo() {
   const [warning, setWarning] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [space, setSpace] = useState<'kid' | 'parent'>('kid')
-  const [view, setView] = useState<
-    'library' | 'review' | 'practice' | 'report'
-  >('library')
-  const [bookFilter, setBookFilter] = useState<'all' | VocabularyUnit['book']>(
-    'all',
-  )
+  const [view, setView] = useState<View>('library')
+  const [settings, setSettings] = useState<Settings>(loadSettings)
+  const [bookFilter, setBookFilter] = useState<'all' | Book>('all')
   const [showCreator, setShowCreator] = useState(false)
-  const [newBook, setNewBook] = useState<VocabularyUnit['book']>('MORE! 1')
+  const [newBook, setNewBook] = useState<Book>('MORE! 1')
   const [newNumber, setNewNumber] = useState('2')
   const [newTitle, setNewTitle] = useState('')
   const [query, setQuery] = useState('')
@@ -128,6 +143,23 @@ export default function OurLingo() {
   const current = round[results.length]
   const choices = roundChoices[results.length] || []
   const complete = round.length > 0 && results.length === round.length
+  const preferredBooks = settings.books
+  const activeBookFilter =
+    bookFilter !== 'all' && preferredBooks.includes(bookFilter)
+      ? bookFilter
+      : 'all'
+  const preferredUnits =
+    library?.units.filter((item) => preferredBooks.includes(item.book)) || []
+  const libraryUnits = preferredUnits.filter(
+    (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
+  )
+  const unitView = view === 'review' || view === 'practice'
+
+  useEffect(() => {
+    applyTheme(settings.theme)
+    if (settings.theme !== 'system') return
+    return watchSystemTheme(() => applyTheme('system'))
+  }, [settings.theme])
   const missed = results
     .filter((result) => !result.correct)
     .map((result) => result.entry)
@@ -360,7 +392,7 @@ export default function OurLingo() {
     )
     const link = document.createElement('a')
     link.href = url
-    link.download = `ourlingo-more-${unit.book === 'MORE! 1' ? 1 : 2}-unit-${unit.unit}.json`
+    link.download = `ourlingo-more-${bookNumber(unit.book)}-unit-${unit.unit}.json`
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -404,7 +436,7 @@ export default function OurLingo() {
     resetRound()
   }
 
-  function nextNumber(book: VocabularyUnit['book']): string {
+  function nextNumber(book: Book): string {
     return String(
       Math.max(
         0,
@@ -416,7 +448,12 @@ export default function OurLingo() {
   }
 
   function beginUnit() {
-    const book = bookFilter === 'all' ? unit?.book || 'MORE! 1' : bookFilter
+    const book =
+      activeBookFilter !== 'all'
+        ? activeBookFilter
+        : unit && preferredBooks.includes(unit.book)
+          ? unit.book
+          : preferredBooks[0]
     setNewBook(book)
     setNewNumber(nextNumber(book))
     setNewTitle('')
@@ -487,7 +524,26 @@ export default function OurLingo() {
     }
   }
 
-  function goTo(next: 'library' | 'review' | 'practice' | 'report') {
+  function updateSettings(next: Settings) {
+    setSettings(next)
+    if (!saveSettings(next))
+      setWarning(
+        'This browser could not save your settings. They apply until the app is closed.',
+      )
+  }
+
+  function togglePreferredBook(book: Book) {
+    const selected = preferredBooks.includes(book)
+    if (selected && preferredBooks.length === 1) return
+    updateSettings({
+      ...settings,
+      books: books.filter((item) =>
+        item === book ? !selected : preferredBooks.includes(item),
+      ),
+    })
+  }
+
+  function goTo(next: View) {
     if (next === 'practice' && !approved) return
     if ((next === 'review' || next === 'report') && space !== 'parent') return
     if (next === view || !mayLeave()) return
@@ -693,7 +749,7 @@ export default function OurLingo() {
         </a>
         <div className="library-label">YOUR LIBRARY</div>
         <div className="unit-label">
-          <div className="book-spine">{unit?.book === 'MORE! 2' ? 2 : 1}</div>
+          <div className="book-spine">{bookNumber(unit?.book || preferredBooks[0])}</div>
           <div>
             <strong>{unit?.book || 'OurLingo'}</strong>
             <span>{unit ? unitLabel(unit) : 'Your units'}</span>
@@ -707,7 +763,7 @@ export default function OurLingo() {
           >
             <BookOpen size={19} />
             My units
-            <span className="nav-count">{library?.units.length || 0}</span>
+            <span className="nav-count">{preferredUnits.length}</span>
           </button>
           {space === 'parent' && unit && (
             <>
@@ -744,6 +800,13 @@ export default function OurLingo() {
             Practice
             <ChevronRight size={16} />
           </button>
+          <button
+            className={view === 'settings' ? 'nav-link active' : 'nav-link'}
+            onClick={() => goTo('settings')}
+          >
+            <SettingsIcon size={19} />
+            Settings
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <div className="study-image">
@@ -767,7 +830,7 @@ export default function OurLingo() {
           <div className="breadcrumb">
             <BookOpen size={17} />
             <span>
-              {view === 'library' || view === 'report' ? 'OurLingo' : unit?.book}
+              {unitView ? unit?.book : 'OurLingo'}
             </span>
             <ChevronRight size={14} />
             <strong>
@@ -775,14 +838,13 @@ export default function OurLingo() {
                 ? 'My units'
                 : view === 'report'
                   ? 'Learning report'
-                  : unit ? unitLabel(unit) : 'Your units'}
+                  : view === 'settings'
+                    ? 'Settings'
+                    : unit ? unitLabel(unit) : 'Your units'}
             </strong>
           </div>
           <div className="topbar-actions">
-            {space === 'parent' &&
-              unit &&
-              view !== 'library' &&
-              view !== 'report' && (
+            {space === 'parent' && unit && unitView && (
               <>
                 <button
                   className="icon-button"
@@ -821,17 +883,21 @@ export default function OurLingo() {
                     ? `${unit ? unitLabel(unit) : 'Your unit'} vocabulary`
                     : view === 'report'
                       ? 'Learning report'
-                      : 'A little practice'}
+                      : view === 'settings'
+                        ? 'Settings'
+                        : 'A little practice'}
               </h1>
               <p>
                 {view === 'library'
-                  ? 'MORE! 1 + MORE! 2 · English / Deutsch'
+                  ? `${preferredBooks.join(' + ')} · English / Deutsch`
                   : view === 'report'
                     ? 'Progress saved on this device'
-                  : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
+                    : view === 'settings'
+                      ? 'Saved on this device'
+                      : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
               </p>
             </div>
-            {view !== 'library' && view !== 'report' && (
+            {unitView && (
               <>
                 <span className={`status-badge ${approved ? 'approved' : ''}`}>
                   <span />
@@ -887,26 +953,28 @@ export default function OurLingo() {
               aria-label={space === 'kid' ? 'Kid space' : 'Parent unit library'}
             >
               <div className="library-toolbar">
-                <fieldset className="book-filter">
-                  <legend className="visually-hidden">Filter by book</legend>
-                  <div className="segmented">
-                    {(['all', 'MORE! 1', 'MORE! 2'] as const).map((book) => (
-                      <label
-                        key={book}
-                        className={bookFilter === book ? 'selected' : ''}
-                      >
-                        <input
-                          type="radio"
-                          name="book-filter"
-                          value={book}
-                          checked={bookFilter === book}
-                          onChange={() => setBookFilter(book)}
-                        />
-                        {book === 'all' ? 'All books' : book}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
+                {preferredBooks.length > 1 && (
+                  <fieldset className="book-filter">
+                    <legend className="visually-hidden">Filter by book</legend>
+                    <div className="segmented">
+                      {(['all', ...preferredBooks] as const).map((book) => (
+                        <label
+                          key={book}
+                          className={activeBookFilter === book ? 'selected' : ''}
+                        >
+                          <input
+                            type="radio"
+                            name="book-filter"
+                            value={book}
+                            checked={activeBookFilter === book}
+                            onChange={() => setBookFilter(book)}
+                          />
+                          {book === 'all' ? 'All books' : book}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
                 {space === 'parent' && (
                   <button className="button primary" onClick={beginUnit}>
                     <Plus size={18} />
@@ -943,14 +1011,14 @@ export default function OurLingo() {
                       <select
                         value={newBook}
                         onChange={(event) => {
-                          const book = event.target
-                            .value as VocabularyUnit['book']
+                          const book = event.target.value as Book
                           setNewBook(book)
                           setNewNumber(nextNumber(book))
                         }}
                       >
-                        <option>MORE! 1</option>
-                        <option>MORE! 2</option>
+                        {preferredBooks.map((book) => (
+                          <option key={book}>{book}</option>
+                        ))}
                       </select>
                     </label>
                     <label>
@@ -981,77 +1049,123 @@ export default function OurLingo() {
                 </form>
               )}
               <div className="unit-grid">
-                {library.units
-                  .filter(
-                    (item) => bookFilter === 'all' || item.book === bookFilter,
-                  )
-                  .map((item) => (
-                    <article
-                      className={`unit-card ${item.book === 'MORE! 2' ? 'second-book' : ''}`}
-                      key={unitKey(item)}
-                    >
-                      <div className="unit-card-top">
-                        <span className="unit-book-label">{item.book}</span>
-                        {space === 'parent' && (
-                          <button
-                            className="icon-button delete-button"
-                            aria-label={`Delete ${item.book} ${unitLabel(item)}`}
-                            title={`Delete ${item.book} ${unitLabel(item)}`}
-                            onClick={() => deleteUnit(item)}
-                          >
-                            <Trash2 size={17} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="unit-card-heading">
-                        <span className="unit-number">{typeof item.unit === 'number' ? item.unit : <BookOpen size={24} />}</span>
-                        <div>
-                          <h2>{unitLabel(item)}</h2>
-                          <p>
-                            {item.title === unitLabel(item)
-                              ? item.book
-                              : item.title}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="unit-card-details">
-                        <span>{item.entries.length} words & phrases</span>
-                        <span
-                          className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
+                {libraryUnits.map((item) => (
+                  <article
+                    className={`unit-card ${item.book === 'MORE! 2' ? 'second-book' : ''}`}
+                    key={unitKey(item)}
+                  >
+                    <div className="unit-card-top">
+                      <span className="unit-book-label">{item.book}</span>
+                      {space === 'parent' && (
+                        <button
+                          className="icon-button delete-button"
+                          aria-label={`Delete ${item.book} ${unitLabel(item)}`}
+                          title={`Delete ${item.book} ${unitLabel(item)}`}
+                          onClick={() => deleteUnit(item)}
                         >
-                          <span />
-                          {item.reviewStatus === 'approved'
-                            ? 'Ready'
-                            : 'Awaiting review'}
-                        </span>
+                          <Trash2 size={17} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="unit-card-heading">
+                      <span className="unit-number">{typeof item.unit === 'number' ? item.unit : <BookOpen size={24} />}</span>
+                      <div>
+                        <h2>{unitLabel(item)}</h2>
+                        <p>
+                          {item.title === unitLabel(item)
+                            ? item.book
+                            : item.title}
+                        </p>
                       </div>
-                      <button
-                        className={`button ${space === 'kid' ? 'primary' : 'secondary'} unit-action`}
-                        disabled={
-                          space === 'kid' && item.reviewStatus !== 'approved'
-                        }
-                        aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} ${unitLabel(item)}`}
-                        onClick={() => selectUnit(item)}
+                    </div>
+                    <div className="unit-card-details">
+                      <span>{item.entries.length} words & phrases</span>
+                      <span
+                        className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
                       >
-                        {space === 'kid' ? (
-                          <Sparkles size={17} />
-                        ) : (
-                          <ClipboardCheck size={17} />
-                        )}
-                        {space === 'kid' ? 'Practise' : 'Review vocabulary'}
-                        <ArrowRight size={17} />
-                      </button>
-                    </article>
-                  ))}
+                        <span />
+                        {item.reviewStatus === 'approved'
+                          ? 'Ready'
+                          : 'Awaiting review'}
+                      </span>
+                    </div>
+                    <button
+                      className={`button ${space === 'kid' ? 'primary' : 'secondary'} unit-action`}
+                      disabled={
+                        space === 'kid' && item.reviewStatus !== 'approved'
+                      }
+                      aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} ${unitLabel(item)}`}
+                      onClick={() => selectUnit(item)}
+                    >
+                      {space === 'kid' ? (
+                        <Sparkles size={17} />
+                      ) : (
+                        <ClipboardCheck size={17} />
+                      )}
+                      {space === 'kid' ? 'Practise' : 'Review vocabulary'}
+                      <ArrowRight size={17} />
+                    </button>
+                  </article>
+                ))}
               </div>
-              {!library.units.some(
-                (item) => bookFilter === 'all' || item.book === bookFilter,
-              ) && (
+              {!libraryUnits.length && (
                 <div className="empty-state">
                   <BookOpen size={30} />
                   <h2>No units here yet.</h2>
                 </div>
               )}
+            </section>
+          )}
+          {view === 'settings' && (
+            <section className="settings" aria-label="Settings">
+              <fieldset className="settings-group">
+                <legend>Appearance</legend>
+                <p>Follow this device, or always use a light or dark theme.</p>
+                <div className="segmented theme-choice">
+                  {themePreferences.map((theme) => (
+                    <label
+                      key={theme}
+                      className={settings.theme === theme ? 'selected' : ''}
+                    >
+                      <input
+                        type="radio"
+                        name="theme"
+                        value={theme}
+                        checked={settings.theme === theme}
+                        onChange={() => updateSettings({ ...settings, theme })}
+                      />
+                      {themeLabels[theme]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="settings-group">
+                <legend>Books</legend>
+                <p>
+                  Show units from these books. At least one book stays
+                  selected.
+                </p>
+                <div className="book-choices">
+                  {books.map((book) => {
+                    const checked = preferredBooks.includes(book)
+                    return (
+                      <label
+                        key={book}
+                        className={checked ? 'book-choice selected' : 'book-choice'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={checked && preferredBooks.length === 1}
+                          onChange={() => togglePreferredBook(book)}
+                        />
+                        <span className="book-spine">{bookNumber(book)}</span>
+                        {book}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
             </section>
           )}
           {library && space === 'parent' && view === 'report' && (
@@ -1060,7 +1174,7 @@ export default function OurLingo() {
                 Progress is private to this device. A word is known after three
                 correct first attempts in a row; any miss resets its streak.
               </p>
-              {library.units.map((reportUnit) => {
+              {preferredUnits.map((reportUnit) => {
                 const records = new Map(
                   learningProgress.records
                     .filter(

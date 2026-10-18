@@ -20,7 +20,8 @@ For the Windows workspace transition and proposed Tauri v2 packaging work, see [
 - Each matching board repeats for three full passes, reshuffling between passes. Results appear after pass three and score first-try matches from pass one. Retry boards prioritise missed words and add other words from the same unit to fill the five-pair board. Matching uses both languages together and does not use the direction or round-size settings.
 - Parent space includes a learning report with known, still-learning and not-tried words for each unit. A word is marked known after three correct first attempts in a row.
 - The app version is visible in the page footer.
-- The interface follows the device's light or dark appearance setting.
+- Settings (in both spaces) choose a System, Light or Dark theme and which MORE! books appear. The library, book filter, new-unit form and learning report only show the selected books; at least one stays selected. Settings are saved on the device under `ourlingo.settings.v1`. On Android, the status and navigation bar icons follow the chosen theme.
+- To add another MORE! book, extend `books` in `src/vocabulary.ts` and list its unit files in `bundledUnitFiles`; it then appears in Settings and the book filter.
 - Accept listed translation alternatives, optional workbook forms, and differences in case or final punctuation.
 - Download a JSON copy of vocabulary, including unsaved edits.
 - Responsive review and practice layouts for desktop, tablets and phones.

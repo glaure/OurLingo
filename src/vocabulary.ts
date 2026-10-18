@@ -6,9 +6,17 @@ export interface Entry {
   translationSource?: 'suggested' | 'parent'
 }
 
+// Add new MORE! books here; settings, filters and unit creation follow this list.
+export const books = ['MORE! 1', 'MORE! 2'] as const
+export type Book = (typeof books)[number]
+
+export function bookNumber(book: Book): string {
+  return book.replace('MORE! ', '')
+}
+
 export interface VocabularyUnit {
   schemaVersion: 1
-  book: 'MORE! 1' | 'MORE! 2'
+  book: Book
   unit: number | 'irregular-verbs'
   title: string
   source: string
@@ -90,7 +98,7 @@ export function unitLabel(unit: Pick<VocabularyUnit, 'unit'>): string {
 
 function isUnitIdentity(book: unknown, unit: unknown): boolean {
   return (
-    (book === 'MORE! 1' || book === 'MORE! 2') &&
+    books.includes(book as Book) &&
     ((typeof unit === 'number' && Number.isInteger(unit) && unit > 0) ||
       (book === 'MORE! 2' && unit === 'irregular-verbs'))
   )

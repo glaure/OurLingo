@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "tauri": "tauri",
     "lint": "oxlint",
-    "test": "tsx --test src/vocabulary.test.ts",
+    "test": "tsx --test src/vocabulary.test.ts src/settings.test.ts",
     "test:e2e": "playwright test",
     "preview": "vite preview"
   },

@@ -1396,3 +1396,52 @@ test('follows the system dark theme without clipping the phone layout', async ({
     ),
   ).toBe(true)
 })
+
+test('settings choose a theme and preferred books that persist after reload', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const unitCards = page.locator('.unit-card')
+  await expect(unitCards).toHaveCount(31)
+  const theme = () =>
+    page.evaluate(() => ({
+      name: document.documentElement.dataset.theme,
+      page: getComputedStyle(document.documentElement).backgroundColor,
+    }))
+  expect(await theme()).toEqual({ name: 'light', page: 'rgb(247, 249, 248)' })
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('radio', { name: 'Dark', exact: true }).check()
+  expect(await theme()).toEqual({ name: 'dark', page: 'rgb(20, 26, 22)' })
+
+  const moreOne = page.getByRole('checkbox', { name: 'MORE! 1' })
+  const moreTwo = page.getByRole('checkbox', { name: 'MORE! 2' })
+  await moreOne.uncheck()
+  await expect(moreTwo).toBeChecked()
+  await expect(moreTwo).toBeDisabled()
+
+  await page.reload()
+  expect(await theme()).toEqual({ name: 'dark', page: 'rgb(20, 26, 22)' })
+  await expect(page.getByText('MORE! 2 · English / Deutsch')).toBeVisible()
+  await expect(unitCards).toHaveCount(16)
+  await expect(page.getByRole('group', { name: 'Filter by book' })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
+  ).toHaveCount(0)
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await moreOne.check()
+  await page.getByRole('radio', { name: 'System', exact: true }).check()
+  expect(await theme()).toEqual({ name: 'light', page: 'rgb(247, 249, 248)' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect.poll(async () => (await theme()).name).toBe('dark')
+  await page.getByRole('button', { name: 'My units', exact: false }).click()
+  await expect(unitCards).toHaveCount(31)
+})
