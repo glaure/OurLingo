@@ -32,7 +32,7 @@ import {
   books,
   bundledUnitFiles,
   createAnswerChoices,
-  createMatchingRound,
+  createMatchingBoards,
   createRound,
   isLearningProgress,
   isCorrectPracticeAnswer,
@@ -81,7 +81,18 @@ type MatchingSide = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
 declare const __APP_VERSION__: string
-const matchingPasses = 3
+// A matching round shows up to three boards of five different words.
+const matchingBoardCount = 3
+const matchingBoardSize = 5
+
+// Shuffles both columns of a board, avoiding identical orders.
+function shuffleBoard(board: number[]): { english: number[]; german: number[] } {
+  const english = createRound(board, board.length)
+  const german = createRound(board, board.length)
+  if (english.every((index, position) => index === german[position]))
+    german.push(german.shift()!)
+  return { english, german }
+}
 const themeLabels: Record<ThemePreference, string> = {
   system: 'System',
   light: 'Light',
@@ -237,10 +248,8 @@ export default function OurLingo() {
   } | null>(null)
   const [matchedPairs, setMatchedPairs] = useState<number[]>([])
   const [matchingMistakes, setMatchingMistakes] = useState<number[]>([])
-  const [matchingFirstPassMistakes, setMatchingFirstPassMistakes] = useState<
-    number[]
-  >([])
-  const [matchingPass, setMatchingPass] = useState(1)
+  const [matchingBoards, setMatchingBoards] = useState<number[][]>([])
+  const [matchingBoard, setMatchingBoard] = useState(0)
   const [matchingFeedback, setMatchingFeedback] = useState<
     'idle' | 'correct' | 'incorrect'
   >('idle')
@@ -273,6 +282,14 @@ export default function OurLingo() {
     (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
   )
   const unitView = view === 'review' || view === 'practice'
+  const currentBoard = matchingBoards[matchingBoard] ?? []
+  const boardComplete =
+    currentBoard.length > 0 && matchedPairs.length === currentBoard.length
+  const lastBoard = matchingBoard + 1 >= matchingBoards.length
+  const matchedSoFar =
+    matchingBoards
+      .slice(0, matchingBoard)
+      .reduce((total, board) => total + board.length, 0) + matchedPairs.length
   const describedEntries = practiceEntries(entries, 'description')
   const unitSummary = summarizeUnitProgress(
     unit ?? emptyUnit,
@@ -453,7 +470,7 @@ export default function OurLingo() {
         matchingInput.current?.focus({ preventScroll: true })
       else choiceInput.current?.focus()
     }
-  }, [view, current, feedback, practiceMode])
+  }, [view, current, feedback, practiceMode, matchingBoard])
 
   useLayoutEffect(() => {
     if (view !== 'review') return
@@ -728,20 +745,27 @@ export default function OurLingo() {
     setMatchingSelection(null)
     setMatchedPairs([])
     setMatchingMistakes([])
-    setMatchingFirstPassMistakes([])
-    setMatchingPass(1)
+    setMatchingBoards([])
+    setMatchingBoard(0)
     setMatchingFeedback('idle')
     setMatchingError(null)
   }
   function startRound(words = entries) {
     if (practiceMode === 'matching') {
-      const nextRound = createMatchingRound(
+      const priority = words === entries ? [] : words
+      const boards = createMatchingBoards(
         entries,
-        5,
-        words === entries ? [] : words,
+        priority.length
+          ? Math.min(
+              matchingBoardCount,
+              Math.ceil(priority.length / matchingBoardSize),
+            )
+          : matchingBoardCount,
+        matchingBoardSize,
+        priority,
         direction,
       )
-      if (!nextRound.length) {
+      if (!boards.length) {
         setWarning(
           direction === 'description'
             ? 'Matching descriptions needs at least two words with distinct descriptions. A parent can add descriptions in Review vocabulary.'
@@ -749,16 +773,14 @@ export default function OurLingo() {
         )
         return
       }
-      const english = createRound(nextRound, nextRound.length).map((entry) =>
-        nextRound.indexOf(entry),
+      const nextRound = boards.flat()
+      const boardIndices = boards.map((board) =>
+        board.map((entry) => nextRound.indexOf(entry)),
       )
-      const german = createRound(nextRound, nextRound.length).map((entry) =>
-        nextRound.indexOf(entry),
-      )
-      if (english.every((index, position) => index === german[position]))
-        german.push(german.shift()!)
+      const { english, german } = shuffleBoard(boardIndices[0])
       resetRound()
       setRound(nextRound)
+      setMatchingBoards(boardIndices)
       setMatchingEnglish(english)
       setMatchingGerman(german)
       window.scrollTo({ top: 0, behavior: 'instant' })
@@ -863,34 +885,26 @@ export default function OurLingo() {
     }
   }
 
-  function finishMatchingPass() {
-    if (matchedPairs.length !== round.length) return
-    if (matchingPass === 1) setMatchingFirstPassMistakes(matchingMistakes)
-    if (matchingPass < matchingPasses) {
-      setMatchingPass((previous) => previous + 1)
-      const english = createRound(round, round.length).map((entry) =>
-        round.indexOf(entry),
-      )
-      const german = createRound(round, round.length).map((entry) =>
-        round.indexOf(entry),
-      )
-      if (english.every((index, position) => index === german[position]))
-        german.push(german.shift()!)
+  // Every word appears on exactly one board, so its first try decides its score.
+  function finishMatchingBoard() {
+    if (!boardComplete) return
+    const next = matchingBoards[matchingBoard + 1]
+    if (next) {
+      const { english, german } = shuffleBoard(next)
+      setMatchingBoard((previous) => previous + 1)
       setMatchingEnglish(english)
       setMatchingGerman(german)
       setMatchedPairs([])
-      setMatchingMistakes([])
       setMatchingSelection(null)
       setMatchingError(null)
       setMatchingFeedback('idle')
+      window.scrollTo({ top: 0, behavior: 'instant' })
       return
     }
-    const firstPassMistakes =
-      matchingPass === 1 ? matchingMistakes : matchingFirstPassMistakes
     const completedResults = round.map((entry, index) => ({
       entry,
       answer: entry.german,
-      correct: !firstPassMistakes.includes(index),
+      correct: !matchingMistakes.includes(index),
     }))
     saveLearningResults(completedResults)
     setResults(completedResults)
@@ -1915,15 +1929,16 @@ export default function OurLingo() {
                 <div className="matching-container">
                   <div className="round-top">
                     <span>
-                      Matching pairs - Pass {matchingPass} of {matchingPasses}
+                      Matching pairs - Board {matchingBoard + 1} of{' '}
+                      {matchingBoards.length}
                     </span>
                     <span>
-                      {matchedPairs.length} of {round.length} matched
+                      {matchedSoFar} of {round.length} matched
                     </span>
                   </div>
                   <progress
                     max={round.length}
-                    value={matchedPairs.length}
+                    value={matchedSoFar}
                     aria-label="Matching progress"
                   />
                   <div
@@ -1998,10 +2013,10 @@ export default function OurLingo() {
                     className={`matching-feedback ${matchingFeedback}`}
                     role="status"
                   >
-                    {matchedPairs.length === round.length
-                      ? matchingPass < matchingPasses
-                        ? 'Pass complete. Get ready for the next pass!'
-                        : 'All three passes complete!'
+                    {boardComplete
+                      ? lastBoard
+                        ? 'All boards complete!'
+                        : 'Board complete. On to new words!'
                       : matchingFeedback === 'correct'
                         ? "That's a pair!"
                         : matchingFeedback === 'incorrect'
@@ -2010,10 +2025,10 @@ export default function OurLingo() {
                   </div>
                   <button
                     className="button primary answer-button"
-                    disabled={matchedPairs.length !== round.length}
-                    onClick={finishMatchingPass}
+                    disabled={!boardComplete}
+                    onClick={finishMatchingBoard}
                   >
-                    {matchingPass < matchingPasses ? 'Next pass' : 'See results'}
+                    {lastBoard ? 'See results' : 'Next board'}
                     <ArrowRight size={17} />
                   </button>
                   <button

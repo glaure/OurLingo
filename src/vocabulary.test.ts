@@ -6,6 +6,7 @@ import {
   answerSide,
   bundledUnitFiles,
   createAnswerChoices,
+  createMatchingBoards,
   createMatchingRound,
   createRound,
   isCorrectAnswer,
@@ -754,4 +755,30 @@ test('every bundled unit is valid and every word except Irregular Verbs has a su
       assert.equal(entry.descriptionSource, 'suggested', `${file}: ${entry.english}`)
     }
   }
+})
+
+test('matching rounds use up to three boards of different words', () => {
+  const words: Entry[] = Array.from({ length: 12 }, (_, index) => ({
+    english: `word ${index}`,
+    german: `Wort ${index}`,
+    example: null,
+    description: `Clue number ${index}`,
+  }))
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const boards = createMatchingBoards(words)
+    assert.deepEqual(boards.map((board) => board.length), [5, 5, 2])
+    assert.equal(new Set(boards.flat()).size, 12)
+  }
+  const priority = [words[7], words[9]]
+  const retry = createMatchingBoards(words, 1, 5, priority)
+  assert.equal(retry.length, 1)
+  assert.ok(priority.every((entry) => retry[0].includes(entry)))
+  assert.deepEqual(createMatchingBoards(words.slice(0, 3)).map((board) => board.length), [3])
+  const described = words.map((entry, index) =>
+    index < 4 ? entry : { ...entry, description: undefined },
+  )
+  assert.deepEqual(
+    createMatchingBoards(described, 3, 5, [], 'description').map((board) => board.length),
+    [4],
+  )
 })

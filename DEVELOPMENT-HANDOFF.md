@@ -55,7 +55,7 @@ Current features:
 - Parent space supports creation, review, approval and deletion of units in both books. The switch has no PIN or authentication.
 - Only approved units can be practised.
 - Typed and multiple-choice practice in both language directions, with scoring and missed-word retries.
-- Matching-pairs mode: up to five English/German pairs, independently shuffled columns, either-side-first selection, locked matched tiles and mismatch feedback. Each board repeats for three full passes, reshuffling between passes; results score first-try matches from pass one. Retry prioritises missed words and fills from the same unit. Ambiguous or overlapping translations are excluded; small units use fewer pairs, with at least two required.
+- Matching-pairs mode: up to five English/German pairs, independently shuffled columns, either-side-first selection, locked matched tiles and mismatch feedback. A round has up to three boards with different words (up to 15); results score first-try matches across all boards. Retry uses just enough boards for the missed words and fills from the same unit. Ambiguous or overlapping translations are excluded; small units use fewer pairs, with at least two required.
 - Parent-space learning report records per-word first-attempt outcomes locally. Three correct completed rounds in a row marks a word known; there are no separate learner profiles or cross-device sync.
 - The app version is displayed in the page footer and matches npm/Tauri version `0.2.0`.
 - The interface follows the operating system light/dark appearance preference.

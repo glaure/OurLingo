@@ -656,7 +656,29 @@ export function createMatchingRound(
   return selected.length >= 2 && limit >= 2 ? selected : []
 }
 
-export function createRound(entries: Entry[], limit = 10): Entry[] {
+// Splits a matching round into boards of different words. Priority words
+// (e.g. missed words being retried) are placed first.
+export function createMatchingBoards(
+  entries: Entry[],
+  boardCount = 3,
+  size = 5,
+  priority: Entry[] = [],
+  direction: PracticeDirection = 'english',
+): Entry[][] {
+  const boards: Entry[][] = []
+  let remaining = entries
+  let pending = priority
+  for (let board = 0; board < boardCount; board += 1) {
+    const words = createMatchingRound(remaining, size, pending, direction)
+    if (!words.length) break
+    boards.push(words)
+    remaining = remaining.filter((entry) => !words.includes(entry))
+    pending = pending.filter((entry) => !words.includes(entry))
+  }
+  return boards
+}
+
+export function createRound<T>(entries: T[], limit = 10): T[] {
   const shuffled = [...entries]
   for (let index = shuffled.length - 1; index > 0; index--) {
     const otherIndex = Math.floor(Math.random() * (index + 1))

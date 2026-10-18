@@ -97,7 +97,7 @@ async function openReview(page: Page) {
     .click()
 }
 
-async function completeMatchingPass(
+async function completeMatchingBoard(
   page: Page,
   entries: Array<{ english: string; german: string }>,
 ) {
@@ -117,7 +117,7 @@ async function completeMatchingPass(
       .click()
   }
   await expect(page.getByRole('status')).toContainText(
-    /Pass complete|All three passes complete/,
+    /Board complete|All boards complete/,
   )
 }
 
@@ -1043,7 +1043,7 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
   await expect(page.locator('.matching-tile.incorrect')).toHaveCount(2)
   await expect(page.locator('.matching-tile:disabled')).toHaveCount(0)
   await expect(
-    page.getByRole('button', { name: 'Next pass', exact: true }),
+    page.getByRole('button', { name: 'Next board', exact: true }),
   ).toBeDisabled()
   expect(
     await englishGroup
@@ -1082,17 +1082,30 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
       .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
       .click()
   }
-  await expect(page.getByRole('status')).toContainText('Pass complete')
+  await expect(page.getByRole('status')).toContainText('Board complete')
   await expect(page.locator('.matching-tile:disabled')).toHaveCount(10)
-  for (const pass of [2, 3]) {
-    await page.getByRole('button', { name: 'Next pass', exact: true }).click()
+  const seen = new Set(english)
+  for (const board of [2, 3]) {
+    await page.getByRole('button', { name: 'Next board', exact: true }).click()
     await expect(
-      page.getByText(`Matching pairs - Pass ${pass} of 3`, { exact: true }),
+      page.getByText(`Matching pairs - Board ${board} of 3`, { exact: true }),
     ).toBeVisible()
-    await completeMatchingPass(page, unit.entries)
+    await expect(
+      page.getByRole('progressbar', { name: 'Matching progress' }),
+    ).toHaveAttribute('value', String((board - 1) * 5))
+    const boardWords = await englishGroup
+      .locator('.matching-tile > span:first-child')
+      .allTextContents()
+    expect(boardWords).toHaveLength(5)
+    for (const text of boardWords) {
+      expect(seen.has(text)).toBe(false)
+      seen.add(text)
+    }
+    await completeMatchingBoard(page, unit.entries)
   }
+  await expect(page.getByRole('status')).toContainText('All boards complete')
   await page.getByRole('button', { name: 'See results', exact: true }).click()
-  await expect(page.locator('.score')).toHaveText('4 / 5')
+  await expect(page.locator('.score')).toHaveText('14 / 15')
   await expect(
     page.getByText('first-try matches', { exact: true }),
   ).toBeVisible()
@@ -1107,11 +1120,10 @@ test('matching pairs supports either-side selection, mismatch recovery, stable p
     .locator('.matching-tile > span:first-child')
     .allTextContents()
   expect(retryWords).toHaveLength(5)
-  for (const pass of [1, 2, 3]) {
-    if (pass > 1)
-      await page.getByRole('button', { name: 'Next pass', exact: true }).click()
-    await completeMatchingPass(page, unit.entries)
-  }
+  await expect(
+    page.getByText('Matching pairs - Board 1 of 1', { exact: true }),
+  ).toBeVisible()
+  await completeMatchingBoard(page, unit.entries)
   await page.getByRole('button', { name: 'See results', exact: true }).click()
   await expect(page.locator('.score')).toHaveText('5 / 5')
 })
@@ -1152,11 +1164,10 @@ test('small matching units use fewer pairs and ambiguous translations do not app
       .getByRole('button', { name: `Deutsch: ${entry.german}`, exact: true })
       .click()
   }
-  await expect(page.getByRole('status')).toContainText('Pass complete')
-  for (let pass = 2; pass <= 3; pass++) {
-    await page.getByRole('button', { name: 'Next pass', exact: true }).click()
-    await completeMatchingPass(page, pairs)
-  }
+  await expect(page.getByRole('status')).toContainText('All boards complete')
+  await expect(
+    page.getByText('Matching pairs - Board 1 of 1', { exact: true }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'See results', exact: true }).click()
   await expect(page.locator('.score')).toHaveText('2 / 2')
 })
