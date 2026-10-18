@@ -187,6 +187,51 @@ export function isUnitCompleted(
   )
 }
 
+export interface UnitProgressSummary {
+  known: Entry[]
+  learning: Entry[]
+  notTried: Entry[]
+  records: Map<string, LearningProgressRecord>
+  correctAttempts: number
+  incorrectAttempts: number
+  lastPracticedAt: string | null
+}
+
+export function summarizeUnitProgress(
+  unit: VocabularyUnit,
+  progress: LearningProgress,
+): UnitProgressSummary {
+  const records = new Map(
+    progress.records
+      .filter((record) => record.book === unit.book && record.unit === unit.unit)
+      .map((record) => [record.english, record]),
+  )
+  const summary: UnitProgressSummary = {
+    known: [],
+    learning: [],
+    notTried: [],
+    records,
+    correctAttempts: 0,
+    incorrectAttempts: 0,
+    lastPracticedAt: null,
+  }
+  for (const entry of unit.entries) {
+    const record = records.get(entry.english)
+    if (!record) {
+      summary.notTried.push(entry)
+      continue
+    }
+    if (record.correctStreak >= knownStreak) summary.known.push(entry)
+    else if (record.correctAttempts + record.incorrectAttempts > 0)
+      summary.learning.push(entry)
+    summary.correctAttempts += record.correctAttempts
+    summary.incorrectAttempts += record.incorrectAttempts
+    if (!summary.lastPracticedAt || record.lastPracticedAt > summary.lastPracticedAt)
+      summary.lastPracticedAt = record.lastPracticedAt
+  }
+  return summary
+}
+
 // Completed units stay available for revision, and each book also offers its
 // first unfinished approved unit. Irregular Verbs is a reference list used
 // alongside every unit, so it is always offered.

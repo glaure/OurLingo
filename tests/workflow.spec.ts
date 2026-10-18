@@ -1638,3 +1638,57 @@ test('saved libraries receive suggested descriptions without replacing cleared o
   expect(edited.entries[1].description).toBe('A clue written by a parent')
   expect(edited.entries[1].descriptionSource).toBe('parent')
 })
+
+test('practice setup shows unit progress, keeps Start visible on a phone and leads back to the units', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ entries }) => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem(
+        'ourlingo.learning.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          records: entries.map((entry, index) => ({
+            book: 'MORE! 1',
+            unit: 1,
+            english: entry.english,
+            german: entry.german,
+            correctAttempts: index < 3 ? 3 : 1,
+            incorrectAttempts: index < 3 ? 0 : 2,
+            correctStreak: index < 3 ? 3 : 0,
+            lastPracticedAt: new Date().toISOString(),
+          })),
+        }),
+      )
+    },
+    { entries: unit.entries.slice(0, 5) },
+  )
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const card = page.locator('.unit-card').first()
+  await expect(card.getByText(`3 of ${unit.entries.length} known`)).toBeVisible()
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  const stats = page.getByRole('group', { name: 'Your progress in this unit' })
+  await expect(stats.locator('.known strong')).toHaveText('3')
+  await expect(stats.locator('.learning strong')).toHaveText('2')
+  await expect(stats.locator('.not-tried strong')).toHaveText(
+    String(unit.entries.length - 5),
+  )
+  await expect(stats).toContainText('11 correct')
+  await expect(stats).toContainText('4 wrong')
+  await expect(stats).toContainText('Last practised today')
+  await expect(
+    page.getByRole('button', { name: 'Start practice' }),
+  ).toBeInViewport()
+  await page.getByRole('button', { name: 'My units', exact: true }).last().click()
+  await expect(page.locator('.unit-card')).toHaveCount(31)
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await page.locator('.crumb-link').click()
+  await expect(page.locator('.unit-card')).toHaveCount(31)
+})

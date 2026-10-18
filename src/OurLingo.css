@@ -331,16 +331,47 @@
 .report-word-groups li small {
   text-align: right;
 }
+/* Each MORE! book has its own colour: 1 green, 2 red, 3 blue, 4 violet. */
+:root,
+.book-1 {
+  --book-accent: #6fae6a;
+  --book-soft: #e3f2df;
+  --book-ink: #3f6b3a;
+  --book-shade: #c5e0bf;
+  --book-button: #26785e;
+  --book-button-hover: #1d5f49;
+}
+.book-2 {
+  --book-accent: #d9534f;
+  --book-soft: #fde4e2;
+  --book-ink: #a3302c;
+  --book-shade: #f5c4c0;
+  --book-button: #c2413b;
+  --book-button-hover: #a3302c;
+}
+.book-3 {
+  --book-accent: #4a8fd9;
+  --book-soft: #e1edfb;
+  --book-ink: #2a5f9a;
+  --book-shade: #bed7f3;
+  --book-button: #2f6fb7;
+  --book-button-hover: #245a97;
+}
+.book-4 {
+  --book-accent: #9a6bd3;
+  --book-soft: #efe6fa;
+  --book-ink: #6b3fa0;
+  --book-shade: #dac8f1;
+  --book-button: #7b4bb8;
+  --book-button-hover: #653a9c;
+}
 .unit-card {
   border: 1px solid var(--line);
-  border-top: 3px solid #83ae8a;
+  border-top: 3px solid var(--book-accent);
   border-radius: 7px;
   background: #fff;
   padding: 22px;
   min-width: 0;
-}
-.unit-card.second-book {
-  border-top-color: #dca48b;
 }
 .unit-card-top,
 .unit-card-heading,
@@ -357,10 +388,7 @@
 .unit-book-label {
   font-size: 13px;
   font-weight: 650;
-  color: var(--green);
-}
-.second-book .unit-book-label {
-  color: #a96f54;
+  color: var(--book-ink);
 }
 .unit-card-heading {
   margin-bottom: 26px;
@@ -372,15 +400,10 @@
   min-width: 52px;
   height: 64px;
   border-radius: 4px;
-  border-left: 4px solid #9bb679;
-  background: #eaf3e2;
-  color: #527348;
+  border-left: 4px solid var(--book-accent);
+  background: var(--book-soft);
+  color: var(--book-ink);
   font: 600 30px var(--heading);
-}
-.second-book .unit-number {
-  border-left-color: #dca48b;
-  background: #faece5;
-  color: #a96f54;
 }
 .unit-card h2 {
   font: 500 25px var(--heading);
@@ -656,9 +679,9 @@
   width: 33px;
   height: 43px;
   border-radius: 3px;
-  background: #eaf3e2;
-  border-left: 4px solid #9bb679;
-  color: #527348;
+  background: var(--book-soft);
+  border-left: 4px solid var(--book-accent);
+  color: var(--book-ink);
   display: grid;
   place-items: center;
   font: 600 23px var(--heading);
@@ -1864,18 +1887,39 @@ progress::-moz-progress-bar {
   border-color: #3c5044;
   color: var(--ink);
 }
-:where(:root[data-theme='dark']) .unit-card.second-book {
-  border-top-color: #c79479;
+:root[data-theme='dark'],
+:where(:root[data-theme='dark']) .book-1 {
+  --book-accent: #79c79b;
+  --book-soft: #263b30;
+  --book-ink: #9bd9b3;
+  --book-shade: #1b2c22;
+  --book-button: #79c79b;
+  --book-button-hover: #5cad82;
 }
-:where(:root[data-theme='dark']) .unit-number {
-  background: #354332;
-  color: #cee1b7;
+:where(:root[data-theme='dark']) .book-2 {
+  --book-accent: #e0736d;
+  --book-soft: #4a2a28;
+  --book-ink: #f2aaa5;
+  --book-shade: #38201e;
+  --book-button: #e8837d;
+  --book-button-hover: #d9655f;
 }
-:where(:root[data-theme='dark']) .second-book .unit-number {
-  background: #44332d;
-  color: #e2b49b;
+:where(:root[data-theme='dark']) .book-3 {
+  --book-accent: #6fa8e8;
+  --book-soft: #23344a;
+  --book-ink: #a9cdf4;
+  --book-shade: #192739;
+  --book-button: #7fb3ec;
+  --book-button-hover: #5f9be0;
 }
-:where(:root[data-theme='dark']) .second-book .unit-book-label,
+:where(:root[data-theme='dark']) .book-4 {
+  --book-accent: #b48be3;
+  --book-soft: #382c4a;
+  --book-ink: #d3baf2;
+  --book-shade: #2a2139;
+  --book-button: #bd97e8;
+  --book-button-hover: #a77ddc;
+}
 :where(:root[data-theme='dark']) .german-field input,
 :where(:root[data-theme='dark']) .vocabulary-row .german-field textarea {
   color: #d4a58c;
@@ -1905,7 +1949,6 @@ progress::-moz-progress-bar {
   background: #25332b;
   color: var(--ink);
 }
-:where(:root[data-theme='dark']) .unit-label .book-spine,
 :where(:root[data-theme='dark']) .summary-icon.mint,
 :where(:root[data-theme='dark']) .practice-emblem {
   background: #263b30;
@@ -2021,7 +2064,352 @@ progress::-moz-progress-bar {
 :where(:root[data-theme='dark']) .book-choice.selected {
   border-color: var(--green);
 }
-:where(:root[data-theme='dark']) .book-choice .book-spine {
-  background: #263b30;
-  color: #8bd3a9;
+/* Playful touches for kids. Motion is skipped when the device asks for less motion. */
+.kid-library .unit-card {
+  border-radius: 18px;
+  border-top-width: 6px;
+  box-shadow: 0 6px 18px #2f5a4014;
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+.kid-library .unit-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px #2f5a4024;
+}
+.kid-library .unit-number {
+  width: 64px;
+  min-width: 64px;
+  height: 64px;
+  border-left: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 -4px 0 var(--book-shade);
+}
+.kid-library .unit-action {
+  min-height: 50px;
+  font-size: 16px;
+}
+.kid-library .unit-action,
+.practice-section .button:not(.text-button),
+.practice-section .segmented,
+.practice-section .segmented label {
+  border-radius: 999px;
+}
+.practice-section .mode-field .segmented,
+.practice-section .mode-field .segmented label,
+.practice-section .direction-field .segmented,
+.practice-section .direction-field .segmented label {
+  border-radius: 16px;
+}
+.practice-card {
+  border-radius: 18px;
+}
+.practice-emblem {
+  animation: float 3s ease-in-out infinite;
+}
+.cheer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #fff3c4;
+  color: #8a5f00;
+  font-size: 16px;
+  font-weight: 700;
+  animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.answer-feedback.incorrect,
+.matching-tile.incorrect {
+  animation: shake 0.4s;
+}
+.matching-tile.matched {
+  animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.practice-results {
+  position: relative;
+}
+.result-stars {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: #d5ddd8;
+}
+.result-stars .earned {
+  color: #f6b93b;
+  animation: star-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
+}
+.result-stars .earned:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.result-stars .earned:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 50;
+}
+.confetti span {
+  position: absolute;
+  top: -20px;
+  animation-name: confetti-fall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  from {
+    transform: translate(0, 0) rotate(var(--rotate));
+  }
+  to {
+    transform: translate(var(--drift), 105vh)
+      rotate(calc(var(--rotate) + 540deg));
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes star-pop {
+  0% {
+    transform: scale(0) rotate(-30deg);
+  }
+  70% {
+    transform: scale(1.25) rotate(8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+  .practice-emblem,
+  .cheer,
+  .answer-feedback.incorrect,
+  .matching-tile,
+  .result-stars .earned {
+    animation: none;
+  }
+  .kid-library .unit-card {
+    transition: none;
+  }
+  .kid-library .unit-card:hover {
+    transform: none;
+  }
+}
+:where(:root[data-theme='dark']) .kid-library .unit-card {
+  box-shadow: none;
+}
+:where(:root[data-theme='dark']) .unit-card {
+  border-top-color: var(--book-accent);
+}
+:where(:root[data-theme='dark']) .cheer {
+  background: #403a28;
+  color: #f0d27a;
+}
+:where(:root[data-theme='dark']) .result-stars {
+  color: #3c5044;
+}
+/* Light green buttons in dark mode need dark text to stay readable. */
+:where(:root[data-theme='dark']) .primary {
+  color: #10251a;
+}
+/* Practice screens and kid unit cards use the colour of the unit's book. */
+.kid-library .unit-action.primary,
+.practice-section .button.primary {
+  background: var(--book-button);
+}
+.kid-library .unit-action.primary:hover:not(:disabled),
+.practice-section .button.primary:hover:not(:disabled) {
+  background: var(--book-button-hover);
+}
+.practice-section .practice-emblem {
+  background: var(--book-soft);
+  color: var(--book-ink);
+}
+.practice-section .eyebrow,
+.practice-section .question-label {
+  color: var(--book-ink);
+}
+.practice-section .segmented label.selected {
+  color: var(--book-ink);
+  box-shadow: inset 0 0 0 2px var(--book-accent);
+}
+.practice-section .practice-card {
+  border-top: 6px solid var(--book-accent);
+}
+.practice-section progress::-webkit-progress-value,
+.unit-card progress::-webkit-progress-value {
+  background: var(--book-accent);
+}
+.practice-section progress::-moz-progress-bar,
+.unit-card progress::-moz-progress-bar {
+  background: var(--book-accent);
+}
+.crumb-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.crumb-link:hover {
+  color: var(--book-ink);
+}
+.back-to-units {
+  display: flex;
+  justify-content: flex-start;
+  margin: 0 0 10px;
+}
+.unit-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 8px;
+  margin-top: 20px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.unit-stats .stat {
+  display: grid;
+  gap: 2px;
+}
+.unit-stats strong {
+  font: 600 26px var(--heading);
+  color: var(--ink);
+}
+.unit-stats .known strong {
+  color: var(--book-ink);
+}
+.unit-stats span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.unit-stats progress {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+}
+.unit-stats p {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.unit-stats p span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+}
+.unit-stats .stat-correct {
+  color: var(--green);
+}
+.unit-stats .stat-wrong {
+  color: #a77247;
+}
+.unit-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -12px 0 16px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.unit-card-progress progress {
+  flex: 1;
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .practice-view .page-heading {
+    display: none;
+  }
+  .practice-view .practice-section {
+    min-height: 0;
+    padding-top: 0;
+  }
+  .practice-setup .practice-emblem,
+  .practice-setup .eyebrow {
+    display: none;
+  }
+  .practice-setup h2 {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .practice-setup > p {
+    font-size: 14px;
+  }
+  .unit-stats {
+    margin-top: 14px;
+    padding: 10px 12px 8px;
+  }
+  .unit-stats strong {
+    font-size: 21px;
+  }
+  .practice-setup .direction-field {
+    margin: 18px 0 12px;
+  }
+  .practice-setup .direction-field legend {
+    margin-bottom: 6px;
+  }
+  .practice-setup .mode-field .segmented label {
+    min-height: 66px;
+  }
+  .practice-setup .start-button {
+    position: sticky;
+    bottom: calc(10px + var(--safe-bottom));
+    z-index: 5;
+    margin-top: 18px;
+    box-shadow: 0 6px 18px #1d2f2533;
+  }
+}
+:where(:root[data-theme='dark']) .unit-stats {
+  background: #1d2923;
+  border-color: #3c5044;
+}
+:where(:root[data-theme='dark']) .unit-stats .stat-wrong {
+  color: #e2b49b;
 }

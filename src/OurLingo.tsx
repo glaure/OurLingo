@@ -21,6 +21,7 @@ import {
   Search,
   Settings as SettingsIcon,
   Sparkles,
+  Star,
   Trash2,
   Users,
   X,
@@ -45,6 +46,7 @@ import {
   practiceEntries,
   progressionUnits,
   promptText,
+  summarizeUnitProgress,
   storageKey,
   unitKey,
   unitLabel,
@@ -84,6 +86,102 @@ const themeLabels: Record<ThemePreference, string> = {
   light: 'Light',
   dark: 'Dark',
 }
+const cheers = ['Super!', 'You got it!', 'Brilliant!', 'Well done!', 'Yes!', 'Great!']
+const resultTitles = [
+  "Keep going, you're learning!",
+  'Good effort!',
+  'Great job!',
+  'Amazing, every word right!',
+]
+const confettiColours = ['#f6c344', '#ef7d57', '#5fb98c', '#5aa9e6', '#b784e0', '#f28ab2']
+
+// Stars for a finished round: 3 for a perfect round, 2 from 70 %, 1 from 40 %.
+function roundStars(correct: number, total: number): number {
+  if (!total) return 0
+  const share = correct / total
+  return share === 1 ? 3 : share >= 0.7 ? 2 : share >= 0.4 ? 1 : 0
+}
+
+function Confetti() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 48 }, (_, index) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.6,
+      duration: 1.8 + Math.random() * 1.4,
+      size: 6 + Math.random() * 7,
+      rotate: Math.random() * 360,
+      drift: Math.random() * 80 - 40,
+      colour: confettiColours[index % confettiColours.length],
+      round: index % 3 === 0,
+    })),
+  )
+  return (
+    <div className="confetti" aria-hidden="true">
+      {pieces.map((piece, index) => (
+        <span
+          key={index}
+          style={{
+            left: `${piece.left}%`,
+            width: piece.size,
+            height: piece.round ? piece.size : piece.size * 0.45,
+            background: piece.colour,
+            borderRadius: piece.round ? '50%' : 2,
+            animationDelay: `${piece.delay}s`,
+            animationDuration: `${piece.duration}s`,
+            ['--rotate' as string]: `${piece.rotate}deg`,
+            ['--drift' as string]: `${piece.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const emptyUnit: VocabularyUnit = {
+  schemaVersion: 1,
+  book: 'MORE! 1',
+  unit: 1,
+  title: '',
+  source: '',
+  reviewStatus: 'pending',
+  entries: [],
+}
+
+function practisedDate(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const days = Math.round(
+    (new Date(today.toDateString()).getTime() -
+      new Date(date.toDateString()).getTime()) /
+      86_400_000,
+  )
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `on ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+}
+
+function UnitCardProgress({
+  unit,
+  progress,
+}: {
+  unit: VocabularyUnit
+  progress: LearningProgress
+}) {
+  const known = summarizeUnitProgress(unit, progress).known.length
+  return (
+    <div className="unit-card-progress">
+      <progress
+        max={unit.entries.length || 1}
+        value={known}
+        aria-label={`${unit.book} ${unitLabel(unit)} known words`}
+      />
+      <span>
+        {known} of {unit.entries.length} known
+      </span>
+    </div>
+  )
+}
+
 const progressionLabels: Record<UnitProgression, string> = {
   all: 'All units',
   'completed-and-next': 'Completed + next',
@@ -173,6 +271,10 @@ export default function OurLingo() {
   )
   const unitView = view === 'review' || view === 'practice'
   const describedEntries = practiceEntries(entries, 'description')
+  const unitSummary = summarizeUnitProgress(
+    unit ?? emptyUnit,
+    learningProgress,
+  )
   const roundWords = direction === 'description' ? describedEntries : entries
   const matchingDescriptions = direction === 'description'
   function matchingText(entry: Entry, side: MatchingSide): string {
@@ -202,6 +304,7 @@ export default function OurLingo() {
   const missed = results
     .filter((result) => !result.correct)
     .map((result) => result.entry)
+  const stars = roundStars(results.length - missed.length, round.length)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -795,7 +898,7 @@ export default function OurLingo() {
 
   return (
     <div
-      className={`app-shell ${practiceMode === 'matching' && round.length > 0 && !complete ? 'matching-active' : ''}`}
+      className={`app-shell ${practiceMode === 'matching' && round.length > 0 && !complete ? 'matching-active' : ''} ${view === 'practice' ? 'practice-view' : ''} ${unitView && unit ? `book-${bookNumber(unit.book)}` : ''}`}
     >
       <aside className="sidebar">
         <a
@@ -811,7 +914,11 @@ export default function OurLingo() {
         </a>
         <div className="library-label">YOUR LIBRARY</div>
         <div className="unit-label">
-          <div className="book-spine">{bookNumber(unit?.book || preferredBooks[0])}</div>
+          <div
+            className={`book-spine book-${bookNumber(unit?.book || preferredBooks[0])}`}
+          >
+            {bookNumber(unit?.book || preferredBooks[0])}
+          </div>
           <div>
             <strong>{unit?.book || 'OurLingo'}</strong>
             <span>{unit ? unitLabel(unit) : 'Your units'}</span>
@@ -891,9 +998,17 @@ export default function OurLingo() {
         <header className="topbar">
           <div className="breadcrumb">
             <BookOpen size={17} />
-            <span>
-              {unitView ? unit?.book : 'OurLingo'}
-            </span>
+            {unitView ? (
+              <button
+                type="button"
+                className="crumb-link"
+                onClick={() => goTo('library')}
+              >
+                {unit?.book}
+              </button>
+            ) : (
+              <span>OurLingo</span>
+            )}
             <ChevronRight size={14} />
             <strong>
               {view === 'library'
@@ -1011,7 +1126,7 @@ export default function OurLingo() {
           )}
           {library && view === 'library' && (
             <section
-              className="library-section"
+              className={`library-section ${space === 'kid' ? 'kid-library' : ''}`}
               aria-label={space === 'kid' ? 'Kid space' : 'Parent unit library'}
             >
               <div className="library-toolbar">
@@ -1119,7 +1234,7 @@ export default function OurLingo() {
               <div className="unit-grid">
                 {libraryUnits.map((item) => (
                   <article
-                    className={`unit-card ${item.book === 'MORE! 2' ? 'second-book' : ''}`}
+                    className={`unit-card book-${bookNumber(item.book)}`}
                     key={unitKey(item)}
                   >
                     <div className="unit-card-top">
@@ -1146,6 +1261,10 @@ export default function OurLingo() {
                         </p>
                       </div>
                     </div>
+                    <UnitCardProgress
+                      unit={item}
+                      progress={learningProgress}
+                    />
                     <div className="unit-card-details">
                       <span>{item.entries.length} words & phrases</span>
                       <span
@@ -1230,7 +1349,9 @@ export default function OurLingo() {
                           disabled={checked && preferredBooks.length === 1}
                           onChange={() => togglePreferredBook(book)}
                         />
-                        <span className="book-spine">{bookNumber(book)}</span>
+                        <span className={`book-spine book-${bookNumber(book)}`}>
+                          {bookNumber(book)}
+                        </span>
                         {book}
                       </label>
                     )
@@ -1277,29 +1398,12 @@ export default function OurLingo() {
                 correct first attempts in a row; any miss resets its streak.
               </p>
               {preferredUnits.map((reportUnit) => {
-                const records = new Map(
-                  learningProgress.records
-                    .filter(
-                      (record) =>
-                        record.book === reportUnit.book &&
-                        record.unit === reportUnit.unit,
-                    )
-                    .map((record) => [record.english, record]),
-                )
-                const known = reportUnit.entries.filter(
-                  (entry) => (records.get(entry.english)?.correctStreak ?? 0) >= knownStreak,
-                )
-                const inProgress = reportUnit.entries.filter((entry) => {
-                  const record = records.get(entry.english)
-                  return (
-                    !!record &&
-                    record.correctStreak < knownStreak &&
-                    record.correctAttempts + record.incorrectAttempts > 0
-                  )
-                })
-                const notTried = reportUnit.entries.filter(
-                  (entry) => !records.has(entry.english),
-                )
+                const {
+                  known,
+                  learning: inProgress,
+                  notTried,
+                  records,
+                } = summarizeUnitProgress(reportUnit, learningProgress)
                 return (
                   <section
                     className="report-unit"
@@ -1624,6 +1728,14 @@ export default function OurLingo() {
             <section className="practice-section">
               {!round.length && (
                 <div className="practice-setup">
+                  <button
+                    type="button"
+                    className="button text-button back-to-units"
+                    onClick={() => goTo('library')}
+                  >
+                    <ArrowLeft size={16} />
+                    My units
+                  </button>
                   <span className="practice-emblem">
                     <Sparkles size={32} />
                   </span>
@@ -1633,6 +1745,49 @@ export default function OurLingo() {
                     {unit.book} · {unitLabel(unit)} · {entries.length} words &
                     phrases
                   </p>
+                  <div
+                    className="unit-stats"
+                    role="group"
+                    aria-label="Your progress in this unit"
+                  >
+                    <div className="stat known">
+                      <strong>{unitSummary.known.length}</strong>
+                      <span>known</span>
+                    </div>
+                    <div className="stat learning">
+                      <strong>{unitSummary.learning.length}</strong>
+                      <span>learning</span>
+                    </div>
+                    <div className="stat not-tried">
+                      <strong>{unitSummary.notTried.length}</strong>
+                      <span>not tried</span>
+                    </div>
+                    <progress
+                      max={entries.length || 1}
+                      value={unitSummary.known.length}
+                      aria-label="Known words"
+                    />
+                    <p>
+                      {unitSummary.lastPracticedAt ? (
+                        <>
+                          <span className="stat-correct">
+                            <Check size={14} />
+                            {unitSummary.correctAttempts} correct
+                          </span>
+                          <span className="stat-wrong">
+                            <X size={14} />
+                            {unitSummary.incorrectAttempts} wrong
+                          </span>
+                          <span>
+                            Last practised{' '}
+                            {practisedDate(unitSummary.lastPracticedAt)}
+                          </span>
+                        </>
+                      ) : (
+                        "You haven't practised this unit yet. Let's start!"
+                      )}
+                    </p>
+                  </div>
                   <fieldset className="direction-field mode-field">
                     <legend>Practice mode</legend>
                     <div className="segmented">
@@ -1971,6 +2126,12 @@ export default function OurLingo() {
                         className={`answer-feedback ${feedback.correct ? 'correct' : 'incorrect'}`}
                         role="status"
                       >
+                        {feedback.correct && (
+                          <span className="cheer" aria-hidden="true">
+                            <Star size={16} fill="currentColor" />
+                            {cheers[(results.length + round.length) % cheers.length]}
+                          </span>
+                        )}
                         <strong>
                           {feedback.correct ? (
                             <>
@@ -2016,11 +2177,24 @@ export default function OurLingo() {
               )}
               {complete && (
                 <div className="practice-results">
-                  <span className="practice-emblem">
-                    <CheckCircle2 size={34} />
-                  </span>
+                  {stars >= 2 && <Confetti />}
+                  <div
+                    className="result-stars"
+                    role="img"
+                    aria-label={`${stars} of 3 stars`}
+                  >
+                    {[1, 2, 3].map((star) => (
+                      <Star
+                        key={star}
+                        size={star === 2 ? 58 : 44}
+                        className={star <= stars ? 'earned' : ''}
+                        fill={star <= stars ? 'currentColor' : 'none'}
+                        strokeWidth={1.6}
+                      />
+                    ))}
+                  </div>
                   <div className="eyebrow">ROUND COMPLETE</div>
-                  <h2>Another step forward.</h2>
+                  <h2>{resultTitles[stars]}</h2>
                   <div className="score">
                     {results.length - missed.length}
                     <span> / {round.length}</span>
