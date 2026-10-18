@@ -2509,3 +2509,50 @@ progress::-moz-progress-bar {
     padding-block: 8px;
   }
 }
+/* On phones the button to go on stays on screen, even when a board or card is taller than the screen. */
+@media (max-width: 600px) {
+  .practice-section .answer-button {
+    position: sticky;
+    bottom: calc(10px + var(--safe-bottom));
+    z-index: 5;
+    box-shadow: 0 6px 18px #1d2f2533;
+  }
+  .practice-section .answer-button:disabled {
+    opacity: 1;
+    background: var(--book-soft);
+    color: var(--book-ink);
+    box-shadow: 0 6px 18px #1d2f251f;
+  }
+}
+/* During practice on narrow screens the menu rows give way to the board;
+   the current unit sits next to the logo instead. */
+.sidebar-crumb {
+  display: none;
+}
+@media (max-width: 850px) {
+  .practice-view .sidebar {
+    padding-bottom: 14px;
+    align-items: center;
+  }
+  .practice-view .sidebar nav,
+  .practice-view .topbar {
+    display: none;
+  }
+  .practice-view .sidebar-crumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .practice-view .sidebar-crumb strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .practice-view .sidebar-crumb .crumb-link {
+    color: var(--book-ink);
+    font-weight: 600;
+  }
+}

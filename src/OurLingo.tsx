@@ -939,6 +939,19 @@ export default function OurLingo() {
           Our<span>Lingo</span>
           <span className="brand-dot" />
         </a>
+        {view === 'practice' && unit && (
+          <div className="sidebar-crumb" aria-label="Current unit">
+            <button
+              type="button"
+              className="crumb-link"
+              onClick={() => goTo('library')}
+            >
+              {unit.book}
+            </button>
+            <ChevronRight size={14} />
+            <strong>{unitLabel(unit)}</strong>
+          </div>
+        )}
         <div className="library-label">YOUR LIBRARY</div>
         <div className="unit-label">
           <div

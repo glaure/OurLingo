@@ -1697,8 +1697,14 @@ test('practice setup shows unit progress, keeps Start visible on a phone and lea
   await page
     .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
     .click()
-  await page.locator('.crumb-link').click()
+  await expect(page.getByRole('navigation', { name: 'Unit navigation' })).toBeHidden()
+  await expect(page.locator('.topbar')).toBeHidden()
+  const crumb = page.getByLabel('Current unit')
+  await expect(crumb).toContainText('MORE! 1')
+  await expect(crumb).toContainText('Unit 1')
+  await crumb.getByRole('button', { name: 'MORE! 1' }).click()
   await expect(page.locator('.unit-card')).toHaveCount(59)
+  await expect(page.getByRole('navigation', { name: 'Unit navigation' })).toBeVisible()
 })
 
 test('first start asks for the book, mentions Settings and defaults to completed + next', { tag: '@first-start' }, async ({
@@ -1738,4 +1744,32 @@ test('first start asks for the book, mentions Settings and defaults to completed
   ).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'MORE! 2' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'MORE! 1' })).not.toBeChecked()
+})
+
+test('the button to go on stays visible on a phone during long description boards', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true })
+    .click()
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page
+    .getByRole('radio', { name: 'English + Description', exact: true })
+    .check()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const next = page.getByRole('button', { name: 'Next board', exact: true })
+  await expect(next).toBeInViewport()
+  await expect(next).toHaveCSS('opacity', '1')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Back to practice' }).click()
+  await page.getByText('Multiple choice', { exact: true }).click()
+  await page
+    .getByRole('radio', { name: 'Description → English', exact: true })
+    .check()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Check answer', exact: true }),
+  ).toBeInViewport()
 })
