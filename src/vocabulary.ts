@@ -2,6 +2,9 @@ export interface Entry {
   english: string
   german: string
   example: string | null
+  // An English clue for the description practice direction.
+  description?: string
+  descriptionSource?: 'suggested' | 'parent'
   origin?: 'word-file'
   translationSource?: 'suggested' | 'parent'
 }
@@ -64,6 +67,8 @@ export interface VocabularyLibrary {
   schemaVersion: 1
   units: VocabularyUnit[]
   bundledUnitKeys?: string[]
+  // Bundled units whose suggested descriptions were offered to this library.
+  describedUnitKeys?: string[]
 }
 
 export interface LearningProgressRecord {
@@ -216,13 +221,15 @@ export function isVocabularyLibrary(
   if (!value || typeof value !== 'object') return false
   const library = value as Partial<VocabularyLibrary>
   if (library.schemaVersion !== 1 || !Array.isArray(library.units)) return false
-  if (
-    library.bundledUnitKeys !== undefined &&
-    (!Array.isArray(library.bundledUnitKeys) ||
-      !library.bundledUnitKeys.every((key) => typeof key === 'string') ||
-      new Set(library.bundledUnitKeys).size !== library.bundledUnitKeys.length)
-  )
-    return false
+  for (const keys of [library.bundledUnitKeys, library.describedUnitKeys]) {
+    if (
+      keys !== undefined &&
+      (!Array.isArray(keys) ||
+        !keys.every((key) => typeof key === 'string') ||
+        new Set(keys).size !== keys.length)
+    )
+      return false
+  }
   if (!library.units.every(isVocabularyUnit)) return false
   if (
     library.units.some(
@@ -260,6 +267,7 @@ export function mergeBundledUnits(
   const installed = new Set(
     library.bundledUnitKeys ?? [unitKey({ book: 'MORE! 1', unit: 1 })],
   )
+  const described = new Set(library.describedUnitKeys ?? [])
   let merged: VocabularyLibrary = {
     ...library,
     bundledUnitKeys: [...installed],
@@ -271,15 +279,47 @@ export function mergeBundledUnits(
     if (installed.has(key)) {
       if (existing && existing.reviewStatus !== 'approved')
         merged = upsertUnit(merged, { ...existing, reviewStatus: 'approved' })
-      continue
+    } else {
+      if (!existing) merged = upsertUnit(merged, approvedUnit)
+      else if (existing.reviewStatus === 'pending' && !existing.entries.length) {
+        merged = upsertUnit(merged, { ...approvedUnit, title: existing.title })
+      }
+      installed.add(key)
     }
-    if (!existing) merged = upsertUnit(merged, approvedUnit)
-    else if (existing.reviewStatus === 'pending' && !existing.entries.length) {
-      merged = upsertUnit(merged, { ...approvedUnit, title: existing.title })
+    if (!described.has(key)) {
+      const current = merged.units.find((item) => unitKey(item) === key)
+      if (current)
+        merged = upsertUnit(merged, withSuggestedDescriptions(current, unit))
+      described.add(key)
     }
-    installed.add(key)
   }
-  return { ...merged, bundledUnitKeys: [...installed] }
+  return {
+    ...merged,
+    bundledUnitKeys: [...installed],
+    describedUnitKeys: [...described],
+  }
+}
+
+// Adds bundled descriptions to saved words that never had one. Descriptions
+// a parent edited or cleared are kept.
+export function withSuggestedDescriptions(
+  unit: VocabularyUnit,
+  bundled: VocabularyUnit,
+): VocabularyUnit {
+  const suggestions = new Map(
+    bundled.entries
+      .filter((entry) => entry.description?.trim())
+      .map((entry) => [normalizeAnswer(entry.english), entry.description!]),
+  )
+  const entries = unit.entries.map((entry) => {
+    const description = suggestions.get(normalizeAnswer(entry.english))
+    return entry.description !== undefined || !description
+      ? entry
+      : { ...entry, description, descriptionSource: 'suggested' as const }
+  })
+  return entries.some((entry, index) => entry !== unit.entries[index])
+    ? { ...unit, entries }
+    : unit
 }
 
 export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
@@ -302,6 +342,11 @@ export function isVocabularyUnit(value: unknown): value is VocabularyUnit {
         typeof item.german === 'string' &&
         !!item.german.trim() &&
         (item.example === null || typeof item.example === 'string') &&
+        (item.description === undefined ||
+          typeof item.description === 'string') &&
+        (item.descriptionSource === undefined ||
+          item.descriptionSource === 'suggested' ||
+          item.descriptionSource === 'parent') &&
         (item.origin === undefined || item.origin === 'word-file') &&
         (item.translationSource === undefined ||
           item.translationSource === 'suggested' ||
@@ -419,6 +464,54 @@ export function isCorrectAnswer(
   )
 }
 
+// 'english' and 'german' name the answer language; 'description' shows an
+// English description and asks for the English word.
+export type PracticeDirection = 'english' | 'german' | 'description'
+
+export function answerSide(direction: PracticeDirection): 'english' | 'german' {
+  return direction === 'german' ? 'german' : 'english'
+}
+
+export function promptText(entry: Entry, direction: PracticeDirection): string {
+  if (direction === 'english') return entry.german
+  if (direction === 'german') return entry.english
+  return entry.description?.trim() ?? ''
+}
+
+export function practiceEntries(
+  entries: Entry[],
+  direction: PracticeDirection,
+): Entry[] {
+  return direction === 'description'
+    ? entries.filter((entry) => promptText(entry, direction))
+    : entries
+}
+
+function promptKeys(entry: Entry, direction: PracticeDirection): string[] {
+  return direction === 'description'
+    ? [normalizeAnswer(promptText(entry, direction))].filter(Boolean)
+    : acceptedAnswers(entry, direction === 'english' ? 'german' : 'english')
+}
+
+// Descriptions can fit several words with the same meaning ("What's the
+// time?" and "What time is it?"), so any word sharing the description counts.
+export function isCorrectPracticeAnswer(
+  entry: Entry,
+  entries: Entry[],
+  answer: string,
+  direction: PracticeDirection,
+): boolean {
+  if (isCorrectAnswer(entry, answer, answerSide(direction))) return true
+  if (direction !== 'description') return false
+  const description = normalizeAnswer(promptText(entry, direction))
+  return entries.some(
+    (other) =>
+      other !== entry &&
+      normalizeAnswer(promptText(other, direction)) === description &&
+      isCorrectAnswer(other, answer, 'english'),
+  )
+}
+
 export interface AnswerChoice {
   text: string
   correct: boolean
@@ -427,25 +520,21 @@ export interface AnswerChoice {
 export function createAnswerChoices(
   entry: Entry,
   entries: Entry[],
-  direction: 'english' | 'german',
+  direction: PracticeDirection,
   limit = 4,
 ): AnswerChoice[] {
-  const opposite = direction === 'english' ? 'german' : 'english'
-  const answers = new Set(acceptedAnswers(entry, direction))
-  const prompts = new Set(acceptedAnswers(entry, opposite))
-  const seen = new Set([normalizeAnswer(entry[direction])])
+  const side = answerSide(direction)
+  const answers = new Set(acceptedAnswers(entry, side))
+  const prompts = new Set(promptKeys(entry, direction))
+  const seen = new Set([normalizeAnswer(entry[side])])
   const distractors = entries.filter((candidate) => {
-    const label = normalizeAnswer(candidate[direction])
+    const label = normalizeAnswer(candidate[side])
     if (seen.has(label)) return false
     if (
-      acceptedAnswers(candidate, direction).some((answer) =>
-        answers.has(answer),
-      )
+      acceptedAnswers(candidate, side).some((answer) => answers.has(answer))
     )
       return false
-    if (
-      acceptedAnswers(candidate, opposite).some((prompt) => prompts.has(prompt))
-    )
+    if (promptKeys(candidate, direction).some((prompt) => prompts.has(prompt)))
       return false
     seen.add(label)
     return true
@@ -455,31 +544,36 @@ export function createAnswerChoices(
     [entry, ...createRound(distractors, limit - 1)],
     limit,
   ).map((candidate) => ({
-    text: candidate[direction],
+    text: candidate[side],
     correct: candidate === entry,
   }))
 }
 
+// Pairs English with German, or with descriptions when the direction is
+// 'description'. Entries whose answers overlap never share a board.
 export function createMatchingRound(
   entries: Entry[],
   limit = 5,
   priority: Entry[] = [],
+  direction: PracticeDirection = 'english',
 ): Entry[] {
+  const pairDirection = direction === 'description' ? 'description' : 'english'
+  const candidates = practiceEntries(entries, pairDirection)
   const selected: Entry[] = []
   const ordered = [
-    ...priority.filter((entry) => entries.includes(entry)),
-    ...createRound(entries, entries.length),
+    ...priority.filter((entry) => candidates.includes(entry)),
+    ...createRound(candidates, candidates.length),
   ]
   for (const entry of ordered) {
     const english = new Set(acceptedAnswers(entry, 'english'))
-    const german = new Set(acceptedAnswers(entry, 'german'))
+    const paired = new Set(promptKeys(entry, pairDirection))
     if (
       selected.some(
         (other) =>
           acceptedAnswers(other, 'english').some((answer) =>
             english.has(answer),
           ) ||
-          acceptedAnswers(other, 'german').some((answer) => german.has(answer)),
+          promptKeys(other, pairDirection).some((key) => paired.has(key)),
       )
     )
       continue

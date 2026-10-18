@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react'
 import {
+  answerSide,
   bookNumber,
   books,
   bundledUnitFiles,
@@ -33,7 +34,7 @@ import {
   createMatchingRound,
   createRound,
   isLearningProgress,
-  isCorrectAnswer,
+  isCorrectPracticeAnswer,
   isUnitCompleted,
   isVocabularyLibrary,
   isVocabularyUnit,
@@ -41,7 +42,9 @@ import {
   learningProgressStorageKey,
   libraryStorageKey,
   mergeBundledUnits,
+  practiceEntries,
   progressionUnits,
+  promptText,
   storageKey,
   unitKey,
   unitLabel,
@@ -54,6 +57,7 @@ import type {
   Book,
   Entry,
   LearningProgress,
+  PracticeDirection,
   VocabularyLibrary,
   VocabularyUnit,
 } from './vocabulary'
@@ -69,7 +73,8 @@ import type { Settings, ThemePreference, UnitProgression } from './settings'
 import './OurLingo.css'
 
 type View = 'library' | 'review' | 'practice' | 'report' | 'settings'
-type Direction = 'english' | 'german'
+type Direction = PracticeDirection
+type MatchingSide = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
 declare const __APP_VERSION__: string
@@ -126,7 +131,7 @@ export default function OurLingo() {
   const [matchingEnglish, setMatchingEnglish] = useState<number[]>([])
   const [matchingGerman, setMatchingGerman] = useState<number[]>([])
   const [matchingSelection, setMatchingSelection] = useState<{
-    side: Direction
+    side: MatchingSide
     index: number
   } | null>(null)
   const [matchedPairs, setMatchedPairs] = useState<number[]>([])
@@ -167,6 +172,27 @@ export default function OurLingo() {
     (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
   )
   const unitView = view === 'review' || view === 'practice'
+  const describedEntries = practiceEntries(entries, 'description')
+  const roundWords = direction === 'description' ? describedEntries : entries
+  const matchingDescriptions = direction === 'description'
+  function matchingText(entry: Entry, side: MatchingSide): string {
+    return side === 'german' && matchingDescriptions
+      ? promptText(entry, 'description')
+      : entry[side]
+  }
+  const activeDirection: Direction =
+    practiceMode === 'matching' && direction === 'german' ? 'english' : direction
+  const directionOptions: { value: Direction; from: string; to: string }[] =
+    practiceMode === 'matching'
+      ? [
+          { value: 'english', from: 'English', to: '+ Deutsch' },
+          { value: 'description', from: 'English', to: '+ Description' },
+        ]
+      : [
+          { value: 'english', from: 'Deutsch', to: '→ English' },
+          { value: 'german', from: 'English', to: '→ Deutsch' },
+          { value: 'description', from: 'Description', to: '→ English' },
+        ]
 
   useEffect(() => {
     applyTheme(settings.theme)
@@ -188,7 +214,12 @@ export default function OurLingo() {
         const key = unitKey(bundled)
         const installed = updated.bundledUnitKeys?.includes(key)
         const existing = updated.units.find((unit) => unitKey(unit) === key)
-        if (installed && (!existing || existing.reviewStatus === 'approved'))
+        const described = updated.describedUnitKeys?.includes(key)
+        if (
+          installed &&
+          described &&
+          (!existing || existing.reviewStatus === 'approved')
+        )
           continue
         if (controller.signal.aborted) return updated
         try {
@@ -352,6 +383,9 @@ export default function OurLingo() {
               [field]: field === 'example' && !value.trim() ? null : value,
               ...(entry.origin === 'word-file' && field === 'german'
                 ? { translationSource: 'parent' as const }
+                : {}),
+              ...(field === 'description'
+                ? { descriptionSource: 'parent' as const }
                 : {}),
             }
           : entry,
@@ -589,10 +623,13 @@ export default function OurLingo() {
         entries,
         5,
         words === entries ? [] : words,
+        direction,
       )
       if (!nextRound.length) {
         setWarning(
-          'Matching pairs needs at least two distinct translations. You can still use typed answers.',
+          direction === 'description'
+            ? 'Matching descriptions needs at least two words with distinct descriptions. A parent can add descriptions in Review vocabulary.'
+            : 'Matching pairs needs at least two distinct translations. You can still use typed answers.',
         )
         return
       }
@@ -612,8 +649,15 @@ export default function OurLingo() {
       setWarning('')
       return
     }
+    const askable = practiceEntries(words, direction)
+    if (!askable.length) {
+      setWarning(
+        'None of these words has a description yet. A parent can add descriptions in Review vocabulary.',
+      )
+      return
+    }
     const options = new Map(
-      words.map((entry) => [
+      askable.map((entry) => [
         entry,
         practiceMode === 'multiple-choice'
           ? createAnswerChoices(entry, entries, direction)
@@ -622,8 +666,8 @@ export default function OurLingo() {
     )
     const eligible =
       practiceMode === 'multiple-choice'
-        ? words.filter((entry) => options.get(entry)!.length > 1)
-        : words
+        ? askable.filter((entry) => options.get(entry)!.length > 1)
+        : askable
     if (!eligible.length) {
       setWarning(
         'Multiple choice needs at least two distinct word-and-translation pairs. You can still use typed answers.',
@@ -645,7 +689,7 @@ export default function OurLingo() {
       answer: answer.trim(),
       correct:
         practiceMode === 'typed'
-          ? isCorrectAnswer(current, answer, direction)
+          ? isCorrectPracticeAnswer(current, entries, answer, direction)
           : choices.find((choice) => choice.text === answer)?.correct === true,
     })
   }
@@ -678,7 +722,7 @@ export default function OurLingo() {
     setAnswer('')
   }
 
-  function selectMatchingWord(side: Direction, index: number) {
+  function selectMatchingWord(side: MatchingSide, index: number) {
     if (matchedPairs.includes(index)) return
     setMatchingFeedback('idle')
     setMatchingError(null)
@@ -739,7 +783,12 @@ export default function OurLingo() {
   const visibleEntries = entries
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) =>
-      [entry.english, entry.german, entry.example || ''].some((text) =>
+      [
+        entry.english,
+        entry.german,
+        entry.example || '',
+        entry.description || '',
+      ].some((text) =>
         text.toLocaleLowerCase().includes(query.toLocaleLowerCase().trim()),
       ),
     )
@@ -1413,6 +1462,7 @@ export default function OurLingo() {
                     <span>ENGLISH</span>
                     <span>DEUTSCH</span>
                     <span>EXAMPLE SENTENCE</span>
+                    <span>DESCRIPTION</span>
                     <span />
                   </div>
                   {visibleEntries.map(({ entry, index }) => (
@@ -1463,6 +1513,23 @@ export default function OurLingo() {
                             updateEntry(index, 'example', event.target.value)
                           }
                         />
+                      </label>
+                      <label className="entry-field description-field">
+                        <span className="mobile-label">Description</span>
+                        <textarea
+                          rows={2}
+                          aria-label={`Description entry ${index + 1}`}
+                          placeholder="No description"
+                          value={entry.description || ''}
+                          onChange={(event) =>
+                            updateEntry(index, 'description', event.target.value)
+                          }
+                        />
+                        {entry.descriptionSource === 'suggested' && (
+                          <span className="entry-origin">
+                            Suggested description
+                          </span>
+                        )}
                       </label>
                       <button
                         className="icon-button delete-button"
@@ -1614,55 +1681,58 @@ export default function OurLingo() {
                       </label>
                     </div>
                   </fieldset>
-                  {practiceMode !== 'matching' && (
-                    <>
-                      <fieldset className="direction-field">
-                        <legend>Answer in</legend>
-                        <div className="segmented">
-                          <label
-                            className={
-                              direction === 'english' ? 'selected' : ''
-                            }
-                          >
-                            <input
-                              type="radio"
-                              name="direction"
-                              value="english"
-                              checked={direction === 'english'}
-                              onChange={() => setDirection('english')}
-                            />
-                            English
-                          </label>
-                          <label
-                            className={direction === 'german' ? 'selected' : ''}
-                          >
-                            <input
-                              type="radio"
-                              name="direction"
-                              value="german"
-                              checked={direction === 'german'}
-                              onChange={() => setDirection('german')}
-                            />
-                            Deutsch
-                          </label>
-                        </div>
-                      </fieldset>
-                      <label className="round-size">
-                        Words per round
-                        <select
-                          value={roundSize}
-                          onChange={(event) =>
-                            setRoundSize(Number(event.target.value))
+                  <fieldset className="direction-field">
+                    <legend>
+                      {practiceMode === 'matching' ? 'Pairs' : 'Question'}
+                    </legend>
+                    <div
+                      className={`segmented ${practiceMode === 'matching' ? '' : 'three-way'}`}
+                    >
+                      {directionOptions.map(({ value, from, to }) => (
+                        <label
+                          key={value}
+                          className={
+                            activeDirection === value ? 'selected' : ''
                           }
                         >
-                          <option value={5}>5 words</option>
-                          <option value={10}>10 words</option>
-                          <option value={entries.length}>
-                            All {entries.length} words
-                          </option>
-                        </select>
-                      </label>
-                    </>
+                          <input
+                            type="radio"
+                            name="direction"
+                            aria-label={`${from} ${to}`}
+                            value={value}
+                            checked={activeDirection === value}
+                            onChange={() => setDirection(value)}
+                          />
+                          <span>{from}</span>
+                          <span>{to}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  {direction === 'description' &&
+                    describedEntries.length < entries.length && (
+                      <p className="direction-note">
+                        {describedEntries.length
+                          ? `${describedEntries.length} of ${entries.length} words have a description.`
+                          : 'No word in this unit has a description yet.'}
+                      </p>
+                    )}
+                  {practiceMode !== 'matching' && (
+                    <label className="round-size">
+                      Words per round
+                      <select
+                        value={roundSize}
+                        onChange={(event) =>
+                          setRoundSize(Number(event.target.value))
+                        }
+                      >
+                        <option value={5}>5 words</option>
+                        <option value={10}>10 words</option>
+                        <option value={Math.max(roundWords.length, 1)}>
+                          All {roundWords.length} words
+                        </option>
+                      </select>
+                    </label>
                   )}
                   <button
                     className="button primary start-button"
@@ -1688,7 +1758,9 @@ export default function OurLingo() {
                     value={matchedPairs.length}
                     aria-label="Matching progress"
                   />
-                  <div className="matching-board">
+                  <div
+                    className={`matching-board ${matchingDescriptions ? 'with-descriptions' : ''}`}
+                  >
                     {(['english', 'german'] as const).map((side) => (
                       <section
                         className="matching-column"
@@ -1696,11 +1768,19 @@ export default function OurLingo() {
                         aria-label={
                           side === 'english'
                             ? 'English matching words'
-                            : 'German matching words'
+                            : matchingDescriptions
+                              ? 'Description matching clues'
+                              : 'German matching words'
                         }
                         key={side}
                       >
-                        <h2>{side === 'english' ? 'English' : 'Deutsch'}</h2>
+                        <h2>
+                          {side === 'english'
+                            ? 'English'
+                            : matchingDescriptions
+                              ? 'Description'
+                              : 'Deutsch'}
+                        </h2>
                         <div className="matching-tiles">
                           {(side === 'english'
                             ? matchingEnglish
@@ -1721,14 +1801,18 @@ export default function OurLingo() {
                                 }
                                 key={index}
                                 type="button"
-                                className={`matching-tile ${matched ? 'matched' : ''} ${selected ? 'selected' : ''} ${incorrect ? 'incorrect' : ''}`}
+                                className={`matching-tile ${matched ? 'matched' : ''} ${selected ? 'selected' : ''} ${incorrect ? 'incorrect' : ''} ${side === 'german' && matchingDescriptions ? 'description-tile' : ''}`}
                                 disabled={matched}
                                 aria-pressed={selected}
-                                aria-label={`${side === 'english' ? 'English' : 'Deutsch'}: ${round[index][side]}${matched ? ' (matched)' : ''}`}
-                                lang={side === 'english' ? 'en' : 'de'}
+                                aria-label={`${side === 'english' ? 'English' : matchingDescriptions ? 'Description' : 'Deutsch'}: ${matchingText(round[index], side)}${matched ? ' (matched)' : ''}`}
+                                lang={
+                                  side === 'german' && !matchingDescriptions
+                                    ? 'de'
+                                    : 'en'
+                                }
                                 onClick={() => selectMatchingWord(side, index)}
                               >
-                                <span>{round[index][side]}</span>
+                                <span>{matchingText(round[index], side)}</span>
                                 <span
                                   className="matching-symbol"
                                   aria-hidden="true"
@@ -1803,15 +1887,17 @@ export default function OurLingo() {
                     }}
                   >
                     <span className="question-label">
-                      {direction === 'english' ? 'DEUTSCH' : 'ENGLISH'}
+                      {direction === 'english'
+                        ? 'DEUTSCH'
+                        : direction === 'german'
+                          ? 'ENGLISH'
+                          : 'DESCRIPTION'}
                     </span>
                     <h2
-                      className="question-word"
+                      className={`question-word ${direction === 'description' ? 'question-description' : ''}`}
                       lang={direction === 'english' ? 'de' : 'en'}
                     >
-                      {direction === 'english'
-                        ? current.german
-                        : current.english}
+                      {promptText(current, direction)}
                     </h2>
                     <label
                       className="answer-label"
@@ -1819,7 +1905,7 @@ export default function OurLingo() {
                         practiceMode === 'typed' ? 'practice-answer' : undefined
                       }
                     >
-                      {direction === 'english' ? 'In English' : 'Auf Deutsch'}
+                      {direction === 'german' ? 'Auf Deutsch' : 'In English'}
                     </label>
                     {practiceMode === 'typed' ? (
                       <input
@@ -1829,9 +1915,9 @@ export default function OurLingo() {
                         value={answer}
                         onChange={(event) => setAnswer(event.target.value)}
                         placeholder={
-                          direction === 'english'
-                            ? 'Your answer...'
-                            : 'Deine Antwort...'
+                          direction === 'german'
+                            ? 'Deine Antwort...'
+                            : 'Your answer...'
                         }
                         readOnly={!!feedback}
                         autoComplete="off"
@@ -1844,9 +1930,9 @@ export default function OurLingo() {
                         className="answer-choices"
                         disabled={!!feedback}
                         aria-label={
-                          direction === 'english'
-                            ? 'Answer in English'
-                            : 'Answer in German'
+                          direction === 'german'
+                            ? 'Answer in German'
+                            : 'Answer in English'
                         }
                       >
                         {choices.map((choice, index) => (
@@ -1862,7 +1948,7 @@ export default function OurLingo() {
                               checked={answer === choice.text}
                               onChange={() => setAnswer(choice.text)}
                             />
-                            <span lang={direction === 'english' ? 'en' : 'de'}>
+                            <span lang={direction === 'german' ? 'de' : 'en'}>
                               {choice.text}
                             </span>
                             {feedback && choice.correct && (
@@ -1895,11 +1981,7 @@ export default function OurLingo() {
                             <>One to practise again</>
                           )}
                         </strong>
-                        <p>
-                          {direction === 'english'
-                            ? current.english
-                            : current.german}
-                        </p>
+                        <p>{current[answerSide(direction)]}</p>
                         {current.example && (
                           <blockquote lang="en">{current.example}</blockquote>
                         )}

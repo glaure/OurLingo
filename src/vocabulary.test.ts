@@ -3,24 +3,30 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
   acceptedAnswers,
+  answerSide,
+  bundledUnitFiles,
   createAnswerChoices,
   createMatchingRound,
   createRound,
   isCorrectAnswer,
+  isCorrectPracticeAnswer,
   isLearningProgress,
   isUnitCompleted,
   isVocabularyLibrary,
   isVocabularyUnit,
   learningProgressStorageKey,
   mergeBundledUnits,
+  practiceEntries,
   progressionUnits,
+  promptText,
   unitKey,
   unitLabel,
   updateLearningProgress,
   upsertUnit,
   validateEntries,
+  withSuggestedDescriptions,
 } from './vocabulary.ts'
-import type { LearningProgress, VocabularyUnit } from './vocabulary.ts'
+import type { Entry, LearningProgress, VocabularyUnit } from './vocabulary.ts'
 
 const unit: unknown = JSON.parse(
   readFileSync(
@@ -663,4 +669,88 @@ test('a unit is completed when every word is known and progression offers the ne
     'MORE! 2:irregular-verbs',
   ])
   assert.equal(isUnitCompleted({ ...one, entries: [] }, throughThree), false)
+})
+
+test('description practice uses English answers, shared descriptions and bundled suggestions', () => {
+  const entries: Entry[] = [
+    { english: "What's the time?", german: 'Wie spät ist es?', example: null, description: 'You ask this to know how late it is' },
+    { english: 'What time is it?', german: 'Wie spät ist es?', example: null, description: 'You ask this to know how late it is' },
+    { english: 'silence', german: 'Stille', example: null, description: 'When nobody speaks and you hear nothing' },
+    { english: 'basket', german: 'Korb', example: null, description: 'You put things you buy in there' },
+    { english: 'mess', german: 'Unordnung', example: null },
+  ]
+  assert.equal(answerSide('description'), 'english')
+  assert.equal(promptText(entries[2], 'description'), 'When nobody speaks and you hear nothing')
+  assert.deepEqual(practiceEntries(entries, 'description').map((entry) => entry.english), [
+    "What's the time?",
+    'What time is it?',
+    'silence',
+    'basket',
+  ])
+  assert.ok(isCorrectPracticeAnswer(entries[2], entries, 'Silence', 'description'))
+  assert.ok(isCorrectPracticeAnswer(entries[0], entries, 'What time is it?', 'description'))
+  assert.equal(isCorrectPracticeAnswer(entries[0], entries, 'What time is it?', 'english'), false)
+  assert.equal(isCorrectPracticeAnswer(entries[2], entries, 'basket', 'description'), false)
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const choices = createAnswerChoices(entries[0], entries, 'description')
+    assert.ok(choices.some((choice) => choice.correct && choice.text === "What's the time?"))
+    assert.ok(!choices.some((choice) => choice.text === 'What time is it?'))
+    const board = createMatchingRound(entries, 5, [], 'description')
+    assert.ok(!board.some((entry) => entry.english === 'mess'))
+    assert.ok(
+      board.filter((entry) => entry.english.startsWith('What')).length <= 1,
+    )
+  }
+
+  const saved: VocabularyUnit = {
+    schemaVersion: 1,
+    book: 'MORE! 1',
+    unit: 9,
+    title: 'Unit 9',
+    source: 'Test',
+    reviewStatus: 'approved',
+    entries: [
+      { english: 'silence', german: 'Stille', example: null },
+      { english: 'basket', german: 'Korb', example: null, description: '', descriptionSource: 'parent' },
+      { english: 'mess', german: 'Unordnung', example: null },
+    ],
+  }
+  const bundled = { ...saved, entries: entries.slice(2, 4).map((entry) => ({ ...entry, descriptionSource: 'suggested' as const })) }
+  const described = withSuggestedDescriptions(saved, bundled)
+  assert.equal(described.entries[0].description, 'When nobody speaks and you hear nothing')
+  assert.equal(described.entries[0].descriptionSource, 'suggested')
+  assert.equal(described.entries[1].description, '')
+  assert.equal(described.entries[2], saved.entries[2])
+  assert.equal(withSuggestedDescriptions(described, bundled), described)
+
+  const merged = mergeBundledUnits(
+    { schemaVersion: 1, units: [saved], bundledUnitKeys: ['MORE! 1:9'] },
+    [bundled],
+  )
+  assert.deepEqual(merged.describedUnitKeys, ['MORE! 1:9'])
+  assert.equal(merged.units[0].entries[0].descriptionSource, 'suggested')
+  const again = mergeBundledUnits(
+    { ...merged, units: [{ ...merged.units[0], entries: saved.entries }] },
+    [bundled],
+  )
+  assert.equal(again.units[0].entries[0].description, undefined)
+  assert.equal(isVocabularyLibrary({ ...merged, describedUnitKeys: [1] }), false)
+})
+
+test('every bundled word except Irregular Verbs has a suggested description', () => {
+  for (const { file } of bundledUnitFiles) {
+    const data = JSON.parse(
+      readFileSync(new URL(`../public/data/${file}`, import.meta.url), 'utf8'),
+    ) as VocabularyUnit
+    assert.ok(isVocabularyUnit(data), file)
+    for (const entry of data.entries) {
+      if (data.unit === 'irregular-verbs') {
+        assert.equal(entry.description, undefined, file)
+        continue
+      }
+      assert.ok(entry.description?.trim(), `${file}: ${entry.english}`)
+      assert.equal(entry.descriptionSource, 'suggested', `${file}: ${entry.english}`)
+    }
+  }
 })

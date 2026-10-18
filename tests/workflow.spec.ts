@@ -204,7 +204,7 @@ test('complete a round, retry a missed word, and practise the opposite direction
   await page.getByRole('button', { name: 'See results' }).click()
   await expect(page.locator('.score')).toHaveText('1 / 1')
   await page.getByRole('button', { name: 'Practice settings' }).click()
-  await page.getByText('Deutsch', { exact: true }).click()
+  await page.getByRole('radio', { name: 'English → Deutsch', exact: true }).check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   const english = await page.locator('.question-word').innerText()
   const german = unit.entries
@@ -238,7 +238,7 @@ for (const direction of ['english', 'german'] as const) {
     await page.getByRole('button', { name: 'Practice', exact: true }).click()
     await page.getByText('Multiple choice', { exact: true }).click()
     if (direction === 'german')
-      await page.getByText('Deutsch', { exact: true }).click()
+      await page.getByRole('radio', { name: 'English → Deutsch', exact: true }).check()
     await page.getByLabel('Words per round').selectOption('5')
     await page.getByRole('button', { name: 'Start practice' }).click()
     for (let question = 0; question < 5; question++) {
@@ -1507,4 +1507,134 @@ test('completed + next shows finished units for revision and unlocks the next un
   await expect(page.getByText('Know every word of a unit')).toHaveCount(0)
   await page.reload()
   await expect(unitCards).toHaveCount(15)
+})
+
+test('description practice asks for the English word in typed, multiple choice and matching modes', async ({
+  page,
+}) => {
+  const unitThree = moreOneFixtures.find((fixture) => fixture.unit === 3)!
+  const byDescription = new Map(
+    unitThree.entries.map((entry) => [entry.description, entry]),
+  )
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 3', exact: true })
+    .click()
+
+  await page.getByText('Type answer', { exact: true }).click()
+  await page.getByRole('radio', { name: 'Description → English', exact: true }).check()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.getByText('DESCRIPTION', { exact: true })).toBeVisible()
+  const typed = byDescription.get(
+    (await page.locator('.question-word').textContent())!,
+  )!
+  expect(typed).toBeTruthy()
+  await page.getByLabel('In English', { exact: true }).fill(typed.english.split(/[;,]/)[0])
+  await page.getByRole('button', { name: 'Check answer' }).click()
+  await expect(page.getByText("That's right!")).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Back to practice' }).click()
+
+  await page.getByText('Multiple choice', { exact: true }).click()
+  await expect(
+    page.getByRole('radio', { name: 'Description → English', exact: true }),
+  ).toBeChecked()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const chosen = byDescription.get(
+    (await page.locator('.question-word').textContent())!,
+  )!
+  const choices = page.getByRole('group', { name: 'Answer in English' })
+  await expect(choices.getByRole('radio')).toHaveCount(4)
+  await choices.getByText(chosen.english, { exact: true }).click()
+  await page.getByRole('button', { name: 'Check answer' }).click()
+  await expect(page.getByText("That's right!")).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Back to practice' }).click()
+
+  await page.getByText('Matching pairs', { exact: true }).click()
+  await page.getByRole('radio', { name: 'English + Description', exact: true }).check()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const clues = page.getByRole('group', { name: 'Description matching clues' })
+  await expect(clues.getByRole('button')).toHaveCount(5)
+  const clue = clues.getByRole('button').first()
+  const clueText = (await clue.locator('span').first().textContent())!
+  const pair = byDescription.get(clueText)!
+  await page
+    .getByRole('group', { name: 'English matching words' })
+    .getByRole('button', { name: `English: ${pair.english}`, exact: true })
+    .click()
+  await clue.click()
+  await expect(page.getByText("That's a pair!")).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+})
+
+test('saved libraries receive suggested descriptions without replacing cleared ones', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    (data) => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem(
+        'ourlingo.library.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          bundledUnitKeys: ['MORE! 1:1'],
+          units: [data],
+        }),
+      )
+    },
+    {
+      ...unit,
+      reviewStatus: 'approved',
+      entries: unit.entries.map(
+        ({ description: _description, descriptionSource: _source, ...entry }, index) =>
+          index === 0
+            ? { ...entry, description: '', descriptionSource: 'parent' }
+            : entry,
+      ),
+    },
+  )
+  await page.goto('/')
+  await expect(page.locator('.unit-card')).toHaveCount(31)
+  const saved = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem('ourlingo.library.v1')!).units.find(
+        (item: VocabularyUnit) => item.book === 'MORE! 1' && item.unit === 1,
+      ) as VocabularyUnit,
+  )
+  expect(saved.entries[0].description).toBe('')
+  expect(saved.entries[0].descriptionSource).toBe('parent')
+  expect(saved.entries[1].description).toBe(unit.entries[1].description)
+  expect(saved.entries[1].descriptionSource).toBe('suggested')
+
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Review MORE! 1 Unit 1', exact: true })
+    .click()
+  await expect(
+    page.getByText('Suggested description', { exact: true }),
+  ).toHaveCount(unit.entries.length - 1)
+  await page
+    .getByLabel('Description entry 2', { exact: true })
+    .fill('A clue written by a parent')
+  await expect(
+    page.getByText('Suggested description', { exact: true }),
+  ).toHaveCount(unit.entries.length - 2)
+  await page.getByRole('button', { name: 'Save & approve' }).click()
+  await expect(page.getByRole('status')).toContainText('approved and saved')
+  await page.reload()
+  const edited = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem('ourlingo.library.v1')!).units.find(
+        (item: VocabularyUnit) => item.book === 'MORE! 1' && item.unit === 1,
+      ) as VocabularyUnit,
+  )
+  expect(edited.entries[1].description).toBe('A clue written by a parent')
+  expect(edited.entries[1].descriptionSource).toBe('parent')
 })
