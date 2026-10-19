@@ -107,6 +107,10 @@ export function resolveTheme(theme: ThemePreference): 'light' | 'dark' {
 export function applyTheme(theme: ThemePreference): void {
   const resolved = resolveTheme(theme)
   document.documentElement.dataset.theme = resolved
+  // Colours the browser bar in the web version to match the page background.
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', resolved === 'dark' ? '#141a16' : '#f7f9f8')
   window.OurLingoAndroid?.setDarkTheme(resolved === 'dark')
 }
 

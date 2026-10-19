@@ -173,6 +173,15 @@ Release builds are Android App Bundles for arm64 and armv7, signed with the uplo
 3. Run `scripts/build-android-release.sh` on Linux or `scripts\build-android-release.ps1` on Windows. Both ask for the keystore and key passwords, build the bundle, verify its signature and copy it to `Downloads/OurLingo-release.aab` with its SHA-256 checksum.
 4. Upload `OurLingo-release.aab` in the Play Console.
 
+## Web App (iPhone and iPad)
+
+The same app runs in the browser at <https://glaure.github.io/OurLingo/app/>. On iOS, open it in Safari and use Share > Add to Home Screen; it then starts full screen and works offline. Start it from the home screen icon: Safari may delete the data of websites that were not opened for seven days, but not of home screen apps. Progress in a Safari tab and in the home screen app is stored separately.
+
+- `npm run build:web` builds into `dist/` with the base path `/OurLingo/app/`, adds `sw.js` (a service worker caching every built file, from `web/service-worker.js`) and asks the browser to keep the stored progress. The normal `npm run build` used by Tauri has neither.
+- Test it locally with `npx vite preview --mode web` and open `http://localhost:4173/OurLingo/app/`.
+- `.github/workflows/pages.yml` runs the unit tests, builds the web app and publishes `docs/` with the app in `app/` on every push to `main`. In the repository's Settings > Pages, the source must be set to "GitHub Actions".
+- A new version reaches devices the next time the app is opened online; it is active from the following start.
+
 ## Data and Limitations
 
 The bundled datasets under `public/data/` cover MORE! 1, Units 1-15, MORE! 2, Units 1-15 plus Irregular Verbs, and MORE! 3 and MORE! 4, Units 1-14 each. They are manual transcriptions of user-provided photos, not automated OCR results. These 59 lessons are approved for immediate practice. Parent-created units still start pending until approved. Existing saved edits are preserved when approval is migrated; deleted bundled lessons stay deleted.

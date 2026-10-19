@@ -9,6 +9,15 @@ import { applyTheme, loadSettings } from './settings'
 
 applyTheme(loadSettings().theme)
 
+// The web version (GitHub Pages) keeps working offline and asks the browser
+// not to clear the saved progress. The Android app does not need either.
+if (import.meta.env.MODE === 'web') {
+  navigator.serviceWorker
+    ?.register(`${import.meta.env.BASE_URL}sw.js`)
+    .catch(() => {})
+  navigator.storage?.persist?.().catch(() => false)
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
