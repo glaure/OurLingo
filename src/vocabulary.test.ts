@@ -9,6 +9,7 @@ import {
   createMatchingBoards,
   createMatchingRound,
   createRound,
+  newlyKnownEntries,
   isCorrectAnswer,
   isCorrectPracticeAnswer,
   isLearningProgress,
@@ -421,6 +422,31 @@ test('rounds contain unique entries and leave the original order unchanged', () 
   assert.equal(new Set(round).size, 10)
   assert.deepEqual(unit.entries, original)
   assert.equal(createRound(unit.entries.slice(0, 3)).length, 3)
+})
+
+test('rounds use known words only after every other word', () => {
+  const known = new Set(unit.entries.slice(0, unit.entries.length - 4))
+  const round = createRound(unit.entries, 10, (entry) => known.has(entry))
+  assert.equal(round.length, 10)
+  assert.equal(round.slice(0, 4).every((entry) => !known.has(entry)), true)
+  assert.equal(round.slice(4).every((entry) => known.has(entry)), true)
+})
+
+test('newly known words are the ones that just reached the streak', () => {
+  const [first, second] = unit.entries
+  const record = (entry: typeof first, correctStreak: number) => ({
+    book: unit.book,
+    unit: unit.unit,
+    english: entry.english,
+    german: entry.german,
+    correctAttempts: correctStreak,
+    incorrectAttempts: 0,
+    correctStreak,
+    lastPracticedAt: '2026-10-20T10:00:00.000Z',
+  })
+  const before = { schemaVersion: 1 as const, records: [record(first, 3), record(second, 2)] }
+  const after = { schemaVersion: 1 as const, records: [record(first, 4), record(second, 3)] }
+  assert.deepEqual(newlyKnownEntries(unit, before, after), [second])
 })
 
 test('multiple choice has four distinct options with exactly one correct in both languages', () => {

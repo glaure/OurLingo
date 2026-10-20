@@ -10,19 +10,28 @@ import {
   ClipboardCheck,
   CloudOff,
   FileCheck2,
+  Flame,
+  Footprints,
+  Gem,
+  Crown,
   GraduationCap,
   Languages,
   Keyboard,
   Link2,
   ListChecks,
   LoaderCircle,
+  Lock,
   Plus,
+  Rocket,
   RotateCcw,
   Search,
+  Shapes,
   Settings as SettingsIcon,
   Sparkles,
   Star,
+  Target,
   Trash2,
+  Trophy,
   Users,
   X,
 } from 'lucide-react'
@@ -43,6 +52,7 @@ import {
   learningProgressStorageKey,
   libraryStorageKey,
   mergeBundledUnits,
+  newlyKnownEntries,
   practiceEntries,
   progressionUnits,
   promptText,
@@ -73,13 +83,41 @@ import {
   watchSystemTheme,
 } from './settings'
 import type { Settings, ThemePreference, UnitProgression } from './settings'
+import {
+  achievementStats,
+  activityStorageKey,
+  awardBadges,
+  badges,
+  dayStreak,
+  emptyActivity,
+  isActivity,
+  localDate,
+  recentDays,
+  recordRound,
+} from './activity'
+import type { Activity, Badge, BadgeIcon } from './activity'
 import './OurLingo.css'
 
-type View = 'library' | 'review' | 'practice' | 'report' | 'settings'
+type View =
+  | 'library'
+  | 'review'
+  | 'practice'
+  | 'report'
+  | 'settings'
+  | 'trophies'
 type Direction = PracticeDirection
 type MatchingSide = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
 type Result = { entry: Entry; answer: string; correct: boolean }
+// What a finished round changed, shown on the results screen.
+type RoundOutcome = {
+  learned: Entry[]
+  known: number
+  total: number
+  unitCompleted: boolean
+  nextUnit: VocabularyUnit | null
+  badges: Badge[]
+}
 declare const __APP_VERSION__: string
 // A matching round shows up to three boards of five different words.
 const matchingBoardCount = 3
@@ -199,6 +237,55 @@ const progressionLabels: Record<UnitProgression, string> = {
   'completed-and-next': 'Completed + next',
 }
 
+const badgeIcons: Record<BadgeIcon, typeof Star> = {
+  footprints: Footprints,
+  star: Star,
+  gem: Gem,
+  book: BookOpen,
+  trophy: Trophy,
+  crown: Crown,
+  flame: Flame,
+  shapes: Shapes,
+  rocket: Rocket,
+}
+
+function BadgeMedal({ badge }: { badge: Badge }) {
+  const Icon = badgeIcons[badge.icon]
+  return (
+    <span
+      className={`badge-medal ${badge.book ? `book-${bookNumber(badge.book)}` : `badge-${badge.icon}`}`}
+      aria-hidden="true"
+    >
+      <Icon size={24} strokeWidth={2.2} />
+    </span>
+  )
+}
+
+function dayLabel(date: string, today: string): string {
+  if (date === today) return 'Today'
+  const [year, month, day] = date.split('-').map(Number)
+  const value = new Date(year, month - 1, day)
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date === localDate(yesterday)) return 'Yesterday'
+  return value.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function loadActivity(): Activity {
+  try {
+    const saved = localStorage.getItem(activityStorageKey)
+    if (!saved) return emptyActivity()
+    const parsed: unknown = JSON.parse(saved)
+    return isActivity(parsed) ? parsed : emptyActivity()
+  } catch {
+    return emptyActivity()
+  }
+}
+
 function loadLearningProgress(): LearningProgress {
   const empty: LearningProgress = { schemaVersion: 1, records: [] }
   try {
@@ -215,6 +302,8 @@ export default function OurLingo() {
   const [library, setLibrary] = useState<VocabularyLibrary | null>(null)
   const [learningProgress, setLearningProgress] =
     useState<LearningProgress>(loadLearningProgress)
+  const [activity, setActivity] = useState<Activity>(loadActivity)
+  const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
   const [unit, setUnit] = useState<VocabularyUnit | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [loadError, setLoadError] = useState('')
@@ -296,6 +385,43 @@ export default function OurLingo() {
     learningProgress,
   )
   const roundWords = direction === 'description' ? describedEntries : entries
+  const unitCompleted = !!unit && isUnitCompleted(unit, learningProgress)
+  const wordsToGo = entries.length - unitSummary.known.length
+  const today = localDate()
+  const streak = dayStreak(activity, today)
+  const practisedToday = activity.days.some(
+    (day) => day.date === today && day.rounds > 0,
+  )
+  const stats = achievementStats(
+    library?.units ?? [],
+    learningProgress,
+    activity,
+    today,
+  )
+  // Badges reached before they were saved (e.g. progress from older versions)
+  // count as earned too; they are saved with the next finished round.
+  const isEarned = (badge: Badge) =>
+    !!activity.badges[badge.id] || badge.value(stats) >= badge.goal
+  // Only the chosen books have a book badge; earned badges are listed first.
+  const shownBadges = badges
+    .filter((badge) => !badge.book || preferredBooks.includes(badge.book))
+    .sort((a, b) => Number(isEarned(b)) - Number(isEarned(a)))
+  const earnedBadges = shownBadges.filter(isEarned)
+  // With "Completed + next", each book shows its next locked unit as a goal.
+  const lockedUnits = progressionActive
+    ? preferredBooks.flatMap((book) => {
+        if (activeBookFilter !== 'all' && activeBookFilter !== book) return []
+        const numbered = preferredUnits
+          .filter((item) => item.book === book && typeof item.unit === 'number')
+          .sort((a, b) => Number(a.unit) - Number(b.unit))
+        const locked = numbered.find((item) => !spaceUnits.includes(item))
+        const current = numbered.find(
+          (item) =>
+            spaceUnits.includes(item) && !isUnitCompleted(item, learningProgress),
+        )
+        return locked && current ? [{ unit: locked, after: current }] : []
+      })
+    : []
   const matchingDescriptions = direction === 'description'
   function matchingText(entry: Entry, side: MatchingSide): string {
     return side === 'german' && matchingDescriptions
@@ -735,6 +861,7 @@ export default function OurLingo() {
   }
 
   function resetRound() {
+    setRoundOutcome(null)
     setRound([])
     setRoundChoices([])
     setResults([])
@@ -750,19 +877,23 @@ export default function OurLingo() {
     setMatchingFeedback('idle')
     setMatchingError(null)
   }
+  // Rounds start with the words that are not known yet, so every round helps
+  // to complete the unit. Retried missed words come first instead.
   function startRound(words = entries) {
+    const known = new Set(unitSummary.known)
+    const isKnown = (entry: Entry) => known.has(entry)
     if (practiceMode === 'matching') {
-      const priority = words === entries ? [] : words
+      const retry = words !== entries
       const boards = createMatchingBoards(
         entries,
-        priority.length
+        retry
           ? Math.min(
               matchingBoardCount,
-              Math.ceil(priority.length / matchingBoardSize),
+              Math.ceil(words.length / matchingBoardSize),
             )
           : matchingBoardCount,
         matchingBoardSize,
-        priority,
+        retry ? words : createRound(entries, entries.length, isKnown),
         direction,
       )
       if (!boards.length) {
@@ -812,7 +943,7 @@ export default function OurLingo() {
       )
       return
     }
-    const nextRound = createRound(eligible, roundSize)
+    const nextRound = createRound(eligible, roundSize, isKnown)
     setRound(nextRound)
     setRoundChoices(nextRound.map((entry) => options.get(entry)!))
     setWarning('')
@@ -833,19 +964,67 @@ export default function OurLingo() {
   }
   function saveLearningResults(completedResults: Result[]) {
     if (!unit || !completedResults.length) return
+    const updated = updateLearningProgress(
+      learningProgress,
+      unit,
+      completedResults.map(({ entry, correct }) => ({
+        english: entry.english,
+        german: entry.german,
+        correct,
+      })),
+      new Date().toISOString(),
+    )
+    const learned = newlyKnownEntries(unit, learningProgress, updated)
+    const unitCompleted =
+      !isUnitCompleted(unit, learningProgress) && isUnitCompleted(unit, updated)
+    const nextUnit = unitCompleted
+      ? (library?.units
+          .filter(
+            (item) =>
+              item.book === unit.book &&
+              typeof item.unit === 'number' &&
+              item.reviewStatus === 'approved' &&
+              !isUnitCompleted(item, updated),
+          )
+          .sort((a, b) => Number(a.unit) - Number(b.unit))[0] ?? null)
+      : null
+    const today = localDate()
+    // Badges already reached before this round are saved without a fanfare.
+    const before = awardBadges(
+      activity,
+      achievementStats(library?.units ?? [], learningProgress, activity, today),
+      today,
+    ).activity
+    const played = recordRound(before, {
+      date: today,
+      mode: practiceMode,
+      answers: completedResults.length,
+      correct: completedResults.filter((result) => result.correct).length,
+      learned: learned.map((entry) => ({
+        book: unit.book,
+        unit: unit.unit,
+        english: entry.english,
+        german: entry.german,
+      })),
+    })
+    const awarded = awardBadges(
+      played,
+      achievementStats(library?.units ?? [], updated, played, today),
+      today,
+    )
+    setLearningProgress(updated)
+    setActivity(awarded.activity)
+    setRoundOutcome({
+      learned,
+      known: summarizeUnitProgress(unit, updated).known.length,
+      total: unit.entries.length,
+      unitCompleted,
+      nextUnit,
+      badges: awarded.earned,
+    })
     try {
-      const updated = updateLearningProgress(
-        learningProgress,
-        unit,
-        completedResults.map(({ entry, correct }) => ({
-          english: entry.english,
-          german: entry.german,
-          correct,
-        })),
-        new Date().toISOString(),
-      )
       localStorage.setItem(learningProgressStorageKey, JSON.stringify(updated))
-      setLearningProgress(updated)
+      localStorage.setItem(activityStorageKey, JSON.stringify(awarded.activity))
     } catch {
       setWarning('Practice finished, but progress could not be saved on this device.')
     }
@@ -1010,11 +1189,20 @@ export default function OurLingo() {
             <ChevronRight size={16} />
           </button>
           <button
+            className={view === 'trophies' ? 'nav-link active' : 'nav-link'}
+            onClick={() => goTo('trophies')}
+          >
+            <Trophy size={19} />
+            Trophies
+            <span className="nav-count">{earnedBadges.length}</span>
+          </button>
+          <button
             className={view === 'settings' ? 'nav-link active' : 'nav-link'}
             onClick={() => goTo('settings')}
+            aria-label="Settings"
           >
             <SettingsIcon size={19} />
-            Settings
+            <span className="nav-text">Settings</span>
           </button>
         </nav>
         <div className="sidebar-bottom">
@@ -1057,7 +1245,9 @@ export default function OurLingo() {
                   ? 'Learning report'
                   : view === 'settings'
                     ? 'Settings'
-                    : unit ? unitLabel(unit) : 'Your units'}
+                    : view === 'trophies'
+                      ? 'Trophies'
+                      : unit ? unitLabel(unit) : 'Your units'}
             </strong>
           </div>
           <div className="topbar-actions">
@@ -1102,7 +1292,9 @@ export default function OurLingo() {
                       ? 'Learning report'
                       : view === 'settings'
                         ? 'Settings'
-                        : 'A little practice'}
+                        : view === 'trophies'
+                          ? 'My trophies'
+                          : 'A little practice'}
               </h1>
               <p>
                 {view === 'library'
@@ -1123,7 +1315,9 @@ export default function OurLingo() {
                     ? 'Progress saved on this device'
                     : view === 'settings'
                       ? 'Saved on this device'
-                      : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
+                      : view === 'trophies'
+                        ? 'A little practice every day goes a long way'
+                        : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
               </p>
             </div>
             {unitView && (
@@ -1287,14 +1481,69 @@ export default function OurLingo() {
                   </button>
                 </form>
               )}
+              {space === 'kid' && (
+                <button
+                  type="button"
+                  className="trophy-strip"
+                  onClick={() => goTo('trophies')}
+                  aria-label={`${streak} days in a row, ${stats.knownWords} words known, ${earnedBadges.length} badges. Open trophies`}
+                >
+                  <span className={`streak-count ${practisedToday ? 'today' : ''}`}>
+                    <Flame size={18} />
+                    {streak} {streak === 1 ? 'day' : 'days'}
+                  </span>
+                  <span>
+                    <Gem size={17} />
+                    {stats.knownWords} {stats.knownWords === 1 ? 'word' : 'words'}
+                  </span>
+                  <span>
+                    <Trophy size={17} />
+                    {earnedBadges.length}{' '}
+                    {earnedBadges.length === 1 ? 'badge' : 'badges'}
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+              )}
               {progressionActive && (
                 <p className="library-note">
-                  Completed units stay here to practise again. Know every word
-                  of a unit to unlock the next one.
+                  Get every word of a unit right {knownStreak} times in a row to
+                  complete it and unlock the next unit. Completed units stay
+                  here to practise again.
                 </p>
               )}
               <div className="unit-grid">
-                {libraryUnits.map((item) => (
+                {[
+                  ...libraryUnits.map((item) => ({ item, after: null })),
+                  ...lockedUnits.map(({ unit: item, after }) => ({ item, after })),
+                ]
+                  .sort((a, b) => books.indexOf(a.item.book) - books.indexOf(b.item.book))
+                  .map(({ item, after }) => after ? (
+                  <article
+                    className={`unit-card locked book-${bookNumber(item.book)}`}
+                    key={unitKey(item)}
+                    aria-label={`${item.book} ${unitLabel(item)} locked`}
+                  >
+                    <div className="unit-card-top">
+                      <span className="unit-book-label">{item.book}</span>
+                      <Lock size={18} />
+                    </div>
+                    <div className="unit-card-heading">
+                      <span className="unit-number">{item.unit}</span>
+                      <div>
+                        <h2>{unitLabel(item)}</h2>
+                        <p>
+                          {item.title === unitLabel(item)
+                            ? item.book
+                            : item.title}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="locked-note">
+                      <Lock size={15} />
+                      Complete {unitLabel(after)} to unlock
+                    </p>
+                  </article>
+                ) : (
                   <article
                     className={`unit-card book-${bookNumber(item.book)}`}
                     key={unitKey(item)}
@@ -1338,7 +1587,9 @@ export default function OurLingo() {
                           : space === 'kid' &&
                               isUnitCompleted(item, learningProgress)
                             ? 'Completed'
-                            : 'Ready'}
+                            : progressionActive && typeof item.unit === 'number'
+                              ? 'Up next'
+                              : 'Ready'}
                       </span>
                     </div>
                     <button
@@ -1366,6 +1617,137 @@ export default function OurLingo() {
                   <h2>No units here yet.</h2>
                 </div>
               )}
+            </section>
+          )}
+          {library && view === 'trophies' && (
+            <section className="trophies" aria-label="Trophies">
+              <div className={`streak-card ${practisedToday ? 'today' : ''}`}>
+                <span className="streak-flame">
+                  <Flame size={38} />
+                </span>
+                <div>
+                  <strong>
+                    {streak} {streak === 1 ? 'day' : 'days'} in a row
+                  </strong>
+                  <span>
+                    {practisedToday
+                      ? 'You practised today. See you tomorrow!'
+                      : streak
+                        ? 'Practise today to keep your streak going!'
+                        : 'Practise today to start a streak!'}
+                  </span>
+                  <small>Best streak: {activity.bestStreak} {activity.bestStreak === 1 ? 'day' : 'days'}</small>
+                </div>
+                <ol className="week" aria-label="Last 7 days">
+                  {recentDays(activity, today).map((day) => {
+                    const [year, month, date] = day.date.split('-').map(Number)
+                    const weekday = new Date(year, month - 1, date)
+                    return (
+                      <li
+                        key={day.date}
+                        className={day.rounds ? 'practised' : ''}
+                        aria-label={`${dayLabel(day.date, today)}: ${day.rounds ? `${day.rounds} ${day.rounds === 1 ? 'round' : 'rounds'}` : 'no practice'}`}
+                      >
+                        <span>
+                          {weekday.toLocaleDateString('en-GB', { weekday: 'narrow' })}
+                        </span>
+                        <i>{day.rounds ? <Check size={14} /> : null}</i>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
+              <div className="trophy-stats">
+                <div>
+                  <Gem size={20} />
+                  <strong>{stats.knownWords}</strong>
+                  <span>words known</span>
+                </div>
+                <div>
+                  <BookOpen size={20} />
+                  <strong>{stats.completedUnits}</strong>
+                  <span>units completed</span>
+                </div>
+                <div>
+                  <Star size={20} />
+                  <strong>{activity.rounds}</strong>
+                  <span>rounds played</span>
+                </div>
+              </div>
+              <section className="recent-words" aria-label="Learned recently">
+                <h2>Learned recently</h2>
+                {recentDays(activity, today)
+                  .filter((day) => day.learned.length)
+                  .reverse()
+                  .map((day) => (
+                    <div key={day.date}>
+                      <h3>
+                        {dayLabel(day.date, today)}{' '}
+                        <span>
+                          +{day.learned.length}{' '}
+                          {day.learned.length === 1 ? 'word' : 'words'}
+                        </span>
+                      </h3>
+                      <ul>
+                        {day.learned.map((word) => (
+                          <li
+                            key={`${word.book}:${word.unit}:${word.english}`}
+                            title={word.german}
+                          >
+                            <strong>{word.english}</strong>
+                            <span>{word.german}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                {!recentDays(activity, today).some((day) => day.learned.length) && (
+                  <p>
+                    Words you get right {knownStreak} times in a row show up
+                    here.
+                  </p>
+                )}
+              </section>
+              <section className="badge-section" aria-label="Badges">
+                <h2>
+                  Badges <span>{earnedBadges.length} / {shownBadges.length}</span>
+                </h2>
+                <ul className="badge-grid">
+                  {shownBadges.map((badge) => {
+                    const earned = isEarned(badge)
+                    const earnedOn = activity.badges[badge.id]
+                    const value = Math.min(badge.value(stats), badge.goal)
+                    return (
+                      <li
+                        key={badge.id}
+                        className={earned ? 'earned' : 'locked'}
+                        aria-label={`${badge.title}: ${badge.description}. ${earned ? 'Earned' : `Not earned yet, ${value} of ${badge.goal}`}`}
+                      >
+                        <BadgeMedal badge={badge} />
+                        <strong>{badge.title}</strong>
+                        <span>{badge.description}</span>
+                        {earned ? (
+                          <small>
+                            <Check size={12} />
+                            {earnedOn ? dayLabel(earnedOn, today) : 'Earned'}
+                          </small>
+                        ) : badge.goal > 1 ? (
+                          <progress
+                            max={badge.goal}
+                            value={value}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <small>
+                            <Lock size={12} />
+                            Locked
+                          </small>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
             </section>
           )}
           {view === 'settings' && (
@@ -1829,6 +2211,28 @@ export default function OurLingo() {
                       value={unitSummary.known.length}
                       aria-label="Known words"
                     />
+                    <div
+                      className={`unit-goal ${unitCompleted ? 'done' : ''}`}
+                    >
+                      {unitCompleted ? <Trophy size={20} /> : <Target size={20} />}
+                      <span>
+                        {unitCompleted ? (
+                          <>
+                            <strong>Unit completed!</strong> Practise again
+                            anytime to keep the words fresh.
+                          </>
+                        ) : (
+                          <>
+                            <strong>
+                              {wordsToGo} {wordsToGo === 1 ? 'word' : 'words'}{' '}
+                              to go.
+                            </strong>{' '}
+                            Get each word right {knownStreak} times in a row to
+                            complete this unit.
+                          </>
+                        )}
+                      </span>
+                    </div>
                     <p>
                       {unitSummary.lastPracticedAt ? (
                         <>
@@ -2267,6 +2671,74 @@ export default function OurLingo() {
                       ? 'first-try matches'
                       : 'correct answers'}
                   </p>
+                  {roundOutcome && (
+                    <div className="round-outcome">
+                      {roundOutcome.unitCompleted ? (
+                        <div className="unit-complete" role="status">
+                          <Trophy size={34} />
+                          <strong>{unitLabel(unit)} completed!</strong>
+                          <span>
+                            {roundOutcome.nextUnit
+                              ? `You know all ${roundOutcome.total} words. ${roundOutcome.nextUnit.book} ${unitLabel(roundOutcome.nextUnit)} is unlocked.`
+                              : `You know all ${roundOutcome.total} words.`}
+                          </span>
+                          {roundOutcome.nextUnit && (
+                            <button
+                              className="button primary"
+                              onClick={() => selectUnit(roundOutcome.nextUnit!)}
+                            >
+                              Start {unitLabel(roundOutcome.nextUnit)}
+                              <ArrowRight size={17} />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="unit-progress-result">
+                          <strong>
+                            {roundOutcome.learned.length > 0
+                              ? `+${roundOutcome.learned.length} new ${roundOutcome.learned.length === 1 ? 'word' : 'words'} known!`
+                              : 'Keep going!'}
+                          </strong>
+                          <progress
+                            max={roundOutcome.total || 1}
+                            value={roundOutcome.known}
+                            aria-label="Known words in this unit"
+                          />
+                          <span>
+                            {roundOutcome.known} of {roundOutcome.total} known ·{' '}
+                            {roundOutcome.total - roundOutcome.known} to go to
+                            complete {unitLabel(unit)}
+                          </span>
+                        </div>
+                      )}
+                      {roundOutcome.learned.length > 0 && (
+                        <div className="learned-words" aria-label="Words you now know">
+                          {roundOutcome.learned.map((entry) => (
+                            <span key={entry.english}>
+                              <Check size={13} />
+                              {entry.english}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {roundOutcome.badges.map((badge) => (
+                        <button
+                          type="button"
+                          className="new-badge"
+                          key={badge.id}
+                          onClick={() => goTo('trophies')}
+                        >
+                          <BadgeMedal badge={badge} />
+                          <span>
+                            <small>New badge!</small>
+                            <strong>{badge.title}</strong>
+                            {badge.description}
+                          </span>
+                          <ChevronRight size={18} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {missed.length > 0 ? (
                     <div className="missed-words">
                       <h3>Words to revisit</h3>

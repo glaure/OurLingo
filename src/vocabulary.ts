@@ -215,6 +215,18 @@ export function isUnitCompleted(
   )
 }
 
+// Words of the unit that reached the known streak with these new results.
+export function newlyKnownEntries(
+  unit: VocabularyUnit,
+  before: LearningProgress,
+  after: LearningProgress,
+): Entry[] {
+  const known = (progress: LearningProgress) =>
+    new Set(summarizeUnitProgress(unit, progress).known)
+  const previous = known(before)
+  return [...known(after)].filter((entry) => !previous.has(entry))
+}
+
 export interface UnitProgressSummary {
   known: Entry[]
   learning: Entry[]
@@ -678,7 +690,13 @@ export function createMatchingBoards(
   return boards
 }
 
-export function createRound<T>(entries: T[], limit = 10): T[] {
+// Picks words in random order. Words for which `later` is true (e.g. words
+// already known) are only used once all other words are in the round.
+export function createRound<T>(
+  entries: T[],
+  limit = 10,
+  later: (entry: T) => boolean = () => false,
+): T[] {
   const shuffled = [...entries]
   for (let index = shuffled.length - 1; index > 0; index--) {
     const otherIndex = Math.floor(Math.random() * (index + 1))
@@ -687,5 +705,8 @@ export function createRound<T>(entries: T[], limit = 10): T[] {
       shuffled[index],
     ]
   }
-  return shuffled.slice(0, limit)
+  return [
+    ...shuffled.filter((entry) => !later(entry)),
+    ...shuffled.filter(later),
+  ].slice(0, limit)
 }

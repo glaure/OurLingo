@@ -2569,11 +2569,513 @@ progress::-moz-progress-bar {
     gap: 6px;
     padding-inline: 4px;
   }
-  .nav-link > svg:last-child:not(:first-child) {
-    display: none;
-  }
   .direction-field:not(.mode-field) .segmented label {
     font-size: 14px;
     padding-inline: 6px;
   }
+}
+
+/* Unit goal, round outcome, locked units and trophies. */
+.trophy-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  width: 100%;
+  margin: -6px 0 18px;
+  padding: 12px 16px;
+  border: 1px solid #f3dcb4;
+  border-radius: 16px;
+  background: #fff8ea;
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 15px;
+  text-align: left;
+}
+.trophy-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.trophy-strip > svg:last-child {
+  margin-left: auto;
+  color: var(--muted);
+}
+.trophy-strip:hover {
+  border-color: #e8bf76;
+}
+.trophy-strip svg {
+  color: #c58a1e;
+}
+.streak-count svg {
+  color: #b9b0a0;
+}
+.streak-count.today svg {
+  color: #f08a24;
+}
+.unit-card.locked {
+  border-style: dashed;
+  border-top-style: solid;
+  background: transparent;
+  opacity: 0.75;
+}
+.unit-card.locked .unit-card-top svg {
+  color: var(--muted);
+}
+.unit-card.locked .unit-card-heading {
+  margin-bottom: 16px;
+}
+.unit-card p.locked-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--book-ink);
+  font-weight: 600;
+}
+.unit-goal {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 2px 0 4px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: var(--book-soft);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+}
+.unit-goal svg {
+  color: var(--book-ink);
+  margin-top: 1px;
+}
+.unit-goal strong {
+  color: var(--book-ink);
+}
+.unit-goal.done svg {
+  color: #c58a1e;
+}
+.round-outcome {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.unit-progress-result,
+.unit-complete {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--book-soft);
+  font-size: 13px;
+  color: var(--muted);
+}
+.unit-progress-result strong {
+  font-size: 18px;
+  color: var(--book-ink);
+}
+.unit-progress-result progress {
+  width: 100%;
+  margin: 0;
+}
+.unit-complete {
+  justify-items: center;
+  padding: 20px 16px;
+  border: 2px solid #f0c45a;
+  background: #fff6dc;
+  font-size: 15px;
+  color: var(--ink);
+  animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.unit-complete > svg {
+  color: #d99a16;
+}
+.unit-complete strong {
+  font: 600 24px var(--heading);
+}
+.unit-complete .button {
+  margin-top: 6px;
+}
+.learned-words {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.learned-words span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+.new-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #f3dcb4;
+  border-radius: 16px;
+  background: #fff8ea;
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) 0.3s backwards;
+}
+.new-badge {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.new-badge > span:last-of-type {
+  display: grid;
+  flex: 1;
+}
+.new-badge > svg:last-child {
+  color: var(--muted);
+}
+.new-badge small {
+  color: #b5790f;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.new-badge strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+.badge-medal {
+  --medal: #26785e;
+  --medal-soft: #e3f2df;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid var(--medal);
+  background: var(--medal-soft);
+  color: var(--medal);
+}
+.badge-medal.book-1,
+.badge-medal.book-2,
+.badge-medal.book-3,
+.badge-medal.book-4 {
+  --medal: var(--book-accent);
+  --medal-soft: var(--book-soft);
+  color: var(--book-ink);
+}
+.badge-star,
+.badge-trophy {
+  --medal: #e3a521;
+  --medal-soft: #fff1cc;
+}
+.badge-gem {
+  --medal: #3b9ab5;
+  --medal-soft: #dff1f6;
+}
+.badge-flame {
+  --medal: #ec7a2c;
+  --medal-soft: #fde6d4;
+}
+.badge-shapes {
+  --medal: #d6608f;
+  --medal-soft: #fbe1ec;
+}
+.badge-rocket {
+  --medal: #7b4bb8;
+  --medal-soft: #efe6fa;
+}
+.trophies {
+  display: grid;
+  gap: 18px;
+  max-width: 980px;
+}
+.streak-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px 20px;
+  padding: 18px 20px;
+  border: 1px solid #f3dcb4;
+  border-radius: 20px;
+  background: #fff8ea;
+}
+.streak-flame {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: #f1ebe0;
+  color: #b9b0a0;
+}
+.streak-card.today .streak-flame {
+  background: #fde6d4;
+  color: #f08a24;
+}
+.streak-card > div {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.streak-card > div strong {
+  font: 600 26px var(--heading);
+  color: var(--ink);
+}
+.week {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.week li {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.week i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px dashed #ddd3c2;
+}
+.week .practised i {
+  border: 0;
+  background: #f08a24;
+  color: #fff;
+}
+.trophy-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.trophy-stats > div {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+}
+.trophy-stats svg {
+  color: var(--green);
+}
+.trophy-stats strong {
+  font: 600 28px var(--heading);
+  color: var(--ink);
+}
+.recent-words,
+.badge-section {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.recent-words h2,
+.badge-section h2 {
+  font: 500 22px var(--heading);
+  margin-bottom: 12px;
+}
+.badge-section h2 span {
+  font: 600 14px 'DM Sans Variable', 'DM Sans', sans-serif;
+  color: var(--muted);
+}
+.recent-words > div + div {
+  margin-top: 14px;
+}
+.recent-words h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.recent-words h3 span {
+  color: var(--green);
+}
+.recent-words ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recent-words li {
+  display: grid;
+  padding: 5px 11px;
+  border-radius: 12px;
+  background: var(--mint);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.recent-words li span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.recent-words > p {
+  color: var(--muted);
+  font-size: 14px;
+}
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.badge-grid li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 4px;
+  padding: 14px 10px 12px;
+  border-radius: 14px;
+  background: var(--mint);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.badge-grid li .badge-medal {
+  margin-bottom: 4px;
+}
+.badge-grid strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+.badge-grid small {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  font-weight: 600;
+}
+.badge-grid .earned small {
+  color: var(--green);
+}
+.badge-grid progress {
+  width: 80%;
+  height: 6px;
+  margin-top: 4px;
+}
+.badge-grid .locked {
+  background: transparent;
+  border: 1px dashed var(--line);
+}
+.badge-grid .locked .badge-medal {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+@media (max-width: 600px) {
+  .nav-text,
+  .nav-link > svg:last-child:not(:first-child),
+  .nav-count {
+    display: none;
+  }
+  .trophy-strip {
+    font-size: 14px;
+    gap: 6px 12px;
+    padding: 10px 12px;
+  }
+  .streak-card {
+    grid-template-columns: auto 1fr;
+    padding: 14px;
+  }
+  .streak-card .week {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+  .streak-flame {
+    width: 54px;
+    height: 54px;
+  }
+  .streak-card > div strong {
+    font-size: 22px;
+  }
+  .trophy-stats {
+    gap: 8px;
+  }
+  .trophy-stats > div {
+    padding: 10px 12px;
+  }
+  .trophy-stats strong {
+    font-size: 22px;
+  }
+  .recent-words,
+  .badge-section {
+    padding: 14px;
+  }
+  .badge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+:where(:root[data-theme='dark']) .trophy-strip,
+:where(:root[data-theme='dark']) .streak-card,
+:where(:root[data-theme='dark']) .new-badge {
+  background: #2c2619;
+  border-color: #5a4a2a;
+}
+:where(:root[data-theme='dark']) .unit-complete {
+  background: #332b16;
+  border-color: #a8832d;
+}
+:where(:root[data-theme='dark']) .trophy-stats > div,
+:where(:root[data-theme='dark']) .recent-words,
+:where(:root[data-theme='dark']) .badge-section {
+  background: #1d2923;
+  border-color: #3c5044;
+}
+:where(:root[data-theme='dark']) .streak-flame {
+  background: #3a3326;
+}
+:where(:root[data-theme='dark']) .streak-card.today .streak-flame {
+  background: #4a321e;
+}
+:where(:root[data-theme='dark']) .week i {
+  border-color: #5a4f3c;
+}
+:where(:root[data-theme='dark']) .learned-words span {
+  color: var(--green);
+}
+:where(:root[data-theme='dark']) .new-badge small {
+  color: #f0c45a;
+}
+:where(:root[data-theme='dark']) .badge-medal {
+  --medal: #79c79b;
+  --medal-soft: #263b30;
+}
+:where(:root[data-theme='dark']) .badge-star,
+:where(:root[data-theme='dark']) .badge-trophy {
+  --medal: #f0c45a;
+  --medal-soft: #3d3420;
+}
+:where(:root[data-theme='dark']) .badge-gem {
+  --medal: #6cc3dc;
+  --medal-soft: #1f3a42;
+}
+:where(:root[data-theme='dark']) .badge-flame {
+  --medal: #f29a5a;
+  --medal-soft: #45301f;
+}
+:where(:root[data-theme='dark']) .badge-shapes {
+  --medal: #ec8fb4;
+  --medal-soft: #45263a;
+}
+:where(:root[data-theme='dark']) .badge-rocket {
+  --medal: #bd97e8;
+  --medal-soft: #382c4a;
 }

@@ -1491,17 +1491,23 @@ test('completed + next shows finished units for revision and unlocks the next un
   )
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
-  const unitCards = page.locator('.unit-card')
+  const unitCards = page.locator('.unit-card:not(.locked)')
   await expect(unitCards).toHaveCount(2)
   const unitOne = unitCards.filter({ hasText: 'Unit 1' })
   await expect(unitOne.getByText('Completed', { exact: true })).toBeVisible()
+  await expect(
+    unitCards.filter({ hasText: 'Unit 2' }).getByText('Up next', { exact: true }),
+  ).toBeVisible()
+  const locked = page.getByRole('article', { name: 'MORE! 1 Unit 3 locked' })
+  await expect(locked).toContainText('Complete Unit 2 to unlock')
+  await expect(page.locator('.unit-card.locked')).toHaveCount(1)
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }),
   ).toBeEnabled()
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 1 Unit 2', exact: true }),
   ).toBeEnabled()
-  await expect(page.getByText('Know every word of a unit')).toBeVisible()
+  await expect(page.getByText('to complete it and unlock the next unit')).toBeVisible()
 
   await page.getByRole('button', { name: 'Parent space', exact: true }).click()
   await expect(unitCards).toHaveCount(15)
@@ -1512,7 +1518,8 @@ test('completed + next shows finished units for revision and unlocks the next un
   await page.getByRole('radio', { name: 'All units', exact: true }).check()
   await page.getByRole('button', { name: 'My units', exact: false }).click()
   await expect(unitCards).toHaveCount(15)
-  await expect(page.getByText('Know every word of a unit')).toHaveCount(0)
+  await expect(page.getByText('to complete it and unlock the next unit')).toHaveCount(0)
+  await expect(page.locator('.unit-card.locked')).toHaveCount(0)
   await page.reload()
   await expect(unitCards).toHaveCount(15)
 })
@@ -1727,7 +1734,10 @@ test('first start asks for the book, mentions Settings and defaults to completed
   await start.click()
   await expect(welcome).toHaveCount(0)
   await expect(page.getByText('MORE! 2 · English / Deutsch')).toBeVisible()
-  await expect(page.locator('.unit-card')).toHaveCount(2)
+  await expect(page.locator('.unit-card:not(.locked)')).toHaveCount(2)
+  await expect(
+    page.getByRole('article', { name: 'MORE! 2 Unit 2 locked' }),
+  ).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
   ).toBeVisible()
@@ -1736,7 +1746,7 @@ test('first start asks for the book, mentions Settings and defaults to completed
   ).toBeVisible()
 
   await page.reload()
-  await expect(page.locator('.unit-card')).toHaveCount(2)
+  await expect(page.locator('.unit-card:not(.locked)')).toHaveCount(2)
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(
@@ -1817,4 +1827,161 @@ test('on a tablet held sideways the practice buttons stay visible', async ({
   await expect(
     page.getByRole('button', { name: 'Next board', exact: true }),
   ).toBeInViewport()
+})
+
+// All words of MORE! 1 Unit 1 are known except the last one, which needs one
+// more correct answer.
+async function seedAlmostCompletedUnit(page: Page) {
+  await page.addInitScript(
+    ({ entries }) => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem(
+        'ourlingo.settings.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          theme: 'system',
+          books: ['MORE! 1'],
+          knownBooks: ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'],
+          progression: 'completed-and-next',
+        }),
+      )
+      localStorage.setItem(
+        'ourlingo.learning.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          records: entries.map((entry, index) => ({
+            book: 'MORE! 1',
+            unit: 1,
+            english: entry.english,
+            german: entry.german,
+            correctAttempts: 3,
+            incorrectAttempts: 0,
+            correctStreak: index === entries.length - 1 ? 2 : 3,
+            lastPracticedAt: '2026-10-18T10:00:00.000Z',
+          })),
+        }),
+      )
+    },
+    { entries: unit.entries },
+  )
+}
+
+test('the last missing word comes first, completes the unit and unlocks the next one', async ({
+  page,
+}) => {
+  await seedAlmostCompletedUnit(page)
+  const lastWord = unit.entries[unit.entries.length - 1]
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/')
+  await expect(page.locator('.trophy-strip')).toContainText('0 days')
+  await page
+    .getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true })
+    .click()
+  await expect(page.locator('.unit-goal')).toContainText('1 word to go.')
+  await expect(page.locator('.unit-goal')).toContainText('3 times in a row')
+  await page.getByText('Type answer', { exact: true }).click()
+  await page.getByRole('radio', { name: 'Deutsch → English', exact: true }).check()
+  await page.getByLabel('Words per round').selectOption('5')
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  await expect(page.locator('.question-word')).toHaveText(lastWord.german)
+  for (let question = 0; question < 5; question += 1) {
+    const german = await page.locator('.question-word').textContent()
+    const entry = unit.entries.find((item) => item.german === german)!
+    await page
+      .getByLabel('In English', { exact: true })
+      .fill(entry.english.split(/[;,]/)[0].replace(/\([^)]*\)/g, '').trim())
+    await page.getByRole('button', { name: 'Check answer' }).click()
+    await page.getByRole('button', { name: /Next word|See results/ }).click()
+  }
+  await expect(page.getByText('Unit 1 completed!')).toBeVisible()
+  await expect(page.getByText('MORE! 1 Unit 2 is unlocked.')).toBeVisible()
+  await expect(page.getByLabel('Words you now know')).toContainText(
+    lastWord.english,
+  )
+  // Badges reached earlier (10 known words) are saved without an announcement.
+  await expect(page.locator('.new-badge')).toHaveText([
+    /First steps/,
+    /Perfect!/,
+    /Unit done!/,
+  ])
+  const activity = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('ourlingo.activity.v1')!),
+  )
+  expect(activity.rounds).toBe(1)
+  expect(activity.days[0].learned.map((word: { english: string }) => word.english)).toEqual([
+    lastWord.english,
+  ])
+  expect(Object.keys(activity.badges)).toEqual(
+    expect.arrayContaining(['first-round', 'perfect-round', 'units-1', 'words-10']),
+  )
+
+  await page.getByRole('button', { name: 'Start Unit 2' }).click()
+  await expect(page.getByText('MORE! 1 · Unit 2 · ', { exact: false })).toBeVisible()
+  await expect(page.locator('.unit-goal')).toContainText(
+    `${unitTwo.entries.length} words to go.`,
+  )
+  await page.getByRole('button', { name: 'My units', exact: true }).click()
+  await expect(
+    page.getByRole('article', { name: 'MORE! 1 Unit 3 locked' }),
+  ).toContainText('Complete Unit 2 to unlock')
+  await expect(page.locator('.trophy-strip')).toContainText('1 day')
+})
+
+test('trophies show the streak, recently learned words and badges', async ({
+  page,
+}) => {
+  await seedAlmostCompletedUnit(page)
+  await page.addInitScript(() => {
+    const date = (daysAgo: number) => {
+      const day = new Date()
+      day.setDate(day.getDate() - daysAgo)
+      return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    }
+    if (localStorage.getItem('ourlingo.activity.v1')) return
+    localStorage.setItem(
+      'ourlingo.activity.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        rounds: 4,
+        perfectRounds: 0,
+        modes: ['typed'],
+        bestStreak: 3,
+        badges: { 'first-round': date(3) },
+        days: [3, 2, 1].map((daysAgo) => ({
+          date: date(daysAgo),
+          rounds: 1,
+          answers: 10,
+          correct: 7,
+          learned:
+            daysAgo === 1
+              ? [{ book: 'MORE! 1', unit: 1, english: 'pencil case', german: 'Federpennal' }]
+              : [],
+        })),
+      }),
+    )
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.locator('.trophy-strip').click()
+  await expect(page.getByRole('heading', { name: 'My trophies' })).toBeVisible()
+  await expect(page.locator('.streak-card')).toContainText('3 days in a row')
+  await expect(page.locator('.streak-card')).toContainText(
+    'Practise today to keep your streak going!',
+  )
+  await expect(page.getByRole('list', { name: 'Last 7 days' }).locator('.practised')).toHaveCount(3)
+  const recent = page.getByRole('region', { name: 'Learned recently' })
+  await expect(recent).toContainText('Yesterday')
+  await expect(recent).toContainText('pencil case')
+  const badgeList = page.getByRole('region', { name: 'Badges' })
+  // Earned from saved progress: first round, 3-day streak and 10 known words.
+  await expect(badgeList.locator('li.earned')).toHaveCount(3)
+  await expect(badgeList.getByRole('listitem', { name: /^Word collector/ })).toHaveAccessibleName(
+    /Not earned yet, \d+ of 50/,
+  )
+  await expect(badgeList.getByText('MORE! 1 master')).toBeVisible()
+  await expect(badgeList.getByText('MORE! 2 master')).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('button', { name: 'Trophies', exact: true }).click()
+  await expect(page.locator('.streak-card')).toContainText('3 days in a row')
 })

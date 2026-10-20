@@ -122,7 +122,7 @@ Browser storage uses localStorage key `ourlingo.library.v1`. Units are identifie
 
 `bundledUnitFiles` lists supplementary datasets; `installBundledUnits` loads them independently. `mergeBundledUnits` preserves populated units and approvals, fills empty pending drafts while retaining titles, and records bundledUnitKeys so deleted imports do not reappear. Failed downloads do not discard saved vocabulary or prevent other bundles loading.
 
-Browser data is separate for each browser and URL origin. It is not written into Git or source JSON. Windows cloning and Tauri installation will not copy browser-saved vocabulary or approval automatically. Clearing site data removes the library. Progress is stored under `ourlingo.learning.v1`, separately per installation. There are no separate learner profiles, backend or cross-device synchronization.
+Browser data is separate for each browser and URL origin. It is not written into Git or source JSON. Windows cloning and Tauri installation will not copy browser-saved vocabulary or approval automatically. Clearing site data removes the library. Progress is stored under `ourlingo.learning.v1` and the daily practice history with earned badges under `ourlingo.activity.v1` (see `src/activity.ts`), separately per installation. There are no separate learner profiles, backend or cross-device synchronization.
 
 Before migrating real data, provide and test an import/restore path. Existing JSON downloads cover one selected unit, not the complete library. A full-library backup and restore workflow would be useful before switching origins or storage backends. Do not clear existing browser storage or silently replace parent edits.
 
