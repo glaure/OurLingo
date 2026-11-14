@@ -32,8 +32,32 @@ const progress = {
   records: [
     ...moreOne.entries.map((entry) => record('MORE! 1', entry, 3)),
     ...moreTwo.entries.slice(0, 18).map((entry) => record('MORE! 2', entry, 3)),
-    ...moreTwo.entries.slice(18, 26).map((entry) => record('MORE! 2', entry, 1, 1)),
+    ...moreTwo.entries.slice(18).map((entry) => record('MORE! 2', entry, 2, 1)),
   ],
+}
+
+// Sample practice history: five days in a row up to yesterday, a few badges.
+const day = (daysAgo) => {
+  const date = new Date()
+  date.setDate(date.getDate() - daysAgo)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+const learned = (book, entries) =>
+  entries.map((entry) => ({ book, unit: 1, english: entry.english, german: entry.german }))
+const activity = {
+  schemaVersion: 1,
+  rounds: 14,
+  perfectRounds: 4,
+  modes: ['typed', 'multiple-choice', 'matching'],
+  bestStreak: 5,
+  badges: { 'first-round': day(5), 'perfect-round': day(4), 'words-10': day(3), 'units-1': day(2), 'streak-3': day(3), 'all-modes': day(1) },
+  days: [5, 4, 3, 2, 1].map((daysAgo, index) => ({
+    date: day(daysAgo),
+    rounds: [2, 3, 3, 4, 2][index],
+    answers: [20, 30, 30, 40, 20][index],
+    correct: [16, 26, 27, 37, 19][index],
+    learned: learned(daysAgo > 2 ? 'MORE! 1' : 'MORE! 2', (daysAgo > 2 ? moreOne : moreTwo).entries.slice((5 - daysAgo) * 8 % 40, ((5 - daysAgo) * 8 % 40) + 8)),
+  })),
 }
 
 // Takes the five store screenshots for one device type.
@@ -45,7 +69,7 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
     colorScheme: 'light',
   })
   await page.addInitScript(
-    ({ books, progress }) => {
+    ({ books, progress, activity }) => {
       if (sessionStorage.getItem('seeded')) return
       sessionStorage.setItem('seeded', '1')
       localStorage.setItem(
@@ -59,8 +83,9 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
         }),
       )
       localStorage.setItem('ourlingo.learning.v1', JSON.stringify(progress))
+      localStorage.setItem('ourlingo.activity.v1', JSON.stringify(activity))
     },
-    { books, progress },
+    { books, progress, activity },
   )
   const shot = async (name) => {
     await page.evaluate(() => document.fonts.ready)
@@ -98,10 +123,10 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
     .click()
   await page.getByRole('button', { name: 'Check answer' }).click()
   await page.evaluate(() => window.scrollTo(0, 0))
-  await shot('03-description-question')
+  await shot('03-definition-question')
   await backToSetup()
 
-  // 4. Matching words with descriptions, one pair already found.
+  // 4. Matching words with definitions, one pair already found.
   await page.getByText('Matching pairs', { exact: true }).click()
   await page
     .getByRole('radio', { name: 'English + Definition', exact: true })
@@ -120,7 +145,7 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
     .click()
   await englishTiles.nth(1).click()
   await page.evaluate(() => window.scrollTo(0, 0))
-  await shot('04-matching-descriptions')
+  await shot('04-matching-definitions')
   await backToSetup()
 
   // 5. Results with three stars after a perfect typed round.
