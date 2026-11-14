@@ -55,6 +55,7 @@ import {
   newlyKnownEntries,
   practiceEntries,
   progressionUnits,
+  earlierUnits,
   promptText,
   summarizeUnitProgress,
   storageKey,
@@ -315,6 +316,9 @@ export default function OurLingo() {
   const [settings, setSettings] = useState<Settings>(loadSettings)
   const [firstStart, setFirstStart] = useState(() => !hasSavedSettings())
   const [firstBooks, setFirstBooks] = useState<Book[]>([])
+  const [firstStartUnits, setFirstStartUnits] = useState<
+    Partial<Record<Book, number>>
+  >({})
   const [bookFilter, setBookFilter] = useState<'all' | Book>('all')
   const [showCreator, setShowCreator] = useState(false)
   const [newBook, setNewBook] = useState<Book>('MORE! 1')
@@ -365,11 +369,23 @@ export default function OurLingo() {
   const progressionActive =
     space === 'kid' && settings.progression === 'completed-and-next'
   const spaceUnits = progressionActive
-    ? progressionUnits(preferredUnits, learningProgress)
+    ? progressionUnits(preferredUnits, learningProgress, settings.startUnits)
     : preferredUnits
   const libraryUnits = spaceUnits.filter(
     (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
   )
+  // Units before the start unit stay available to practise.
+  const earlierLibraryUnits = progressionActive
+    ? earlierUnits(preferredUnits, learningProgress, settings.startUnits)
+        .filter(
+          (item) => activeBookFilter === 'all' || item.book === activeBookFilter,
+        )
+        .sort(
+          (a, b) =>
+            books.indexOf(a.book) - books.indexOf(b.book) ||
+            Number(a.unit) - Number(b.unit),
+        )
+    : []
   const unitView = view === 'review' || view === 'practice'
   const currentBoard = matchingBoards[matchingBoard] ?? []
   const boardComplete =
@@ -414,10 +430,15 @@ export default function OurLingo() {
         const numbered = preferredUnits
           .filter((item) => item.book === book && typeof item.unit === 'number')
           .sort((a, b) => Number(a.unit) - Number(b.unit))
-        const locked = numbered.find((item) => !spaceUnits.includes(item))
         const current = numbered.find(
           (item) =>
             spaceUnits.includes(item) && !isUnitCompleted(item, learningProgress),
+        )
+        const locked = numbered.find(
+          (item) =>
+            !spaceUnits.includes(item) &&
+            !!current &&
+            Number(item.unit) > Number(current.unit),
         )
         return locked && current ? [{ unit: locked, after: current }] : []
       })
@@ -839,11 +860,63 @@ export default function OurLingo() {
     })
   }
 
+  // Unit numbers of a book, from the library or, before it has loaded, from
+  // the bundled units.
+  function unitNumbers(book: Book): number[] {
+    const numbers = new Set<number>()
+    for (const item of [...(library?.units ?? []), ...bundledUnitFiles])
+      if (item.book === book && typeof item.unit === 'number')
+        numbers.add(item.unit)
+    return [...numbers].sort((a, b) => a - b)
+  }
+
+  function withStartUnit(
+    startUnits: Partial<Record<Book, number>>,
+    book: Book,
+    start: number,
+  ): Partial<Record<Book, number>> {
+    const next = { ...startUnits }
+    if (start > 1) next[book] = start
+    else delete next[book]
+    return next
+  }
+
+  function startUnitPicker(
+    book: Book,
+    value: number,
+    onChange: (start: number) => void,
+  ) {
+    return (
+      <label key={book} className="start-unit">
+        <span className={`book-spine book-${bookNumber(book)}`}>
+          {bookNumber(book)}
+        </span>
+        <span>{book}</span>
+        <select
+          value={value}
+          aria-label={`${book} start unit`}
+          onChange={(event) => onChange(Number(event.target.value))}
+        >
+          {unitNumbers(book).map((number) => (
+            <option key={number} value={number}>
+              Unit {number}
+            </option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+
   function finishFirstStart() {
     if (!firstBooks.length) return
+    const startUnits: Partial<Record<Book, number>> = {}
+    for (const book of firstBooks)
+      if ((firstStartUnits[book] ?? 1) > 1)
+        startUnits[book] = firstStartUnits[book]
     updateSettings({
       ...settings,
       books: books.filter((book) => firstBooks.includes(book)),
+      startUnits,
     })
     setBookFilter('all')
     setFirstStart(false)
@@ -1087,6 +1160,78 @@ export default function OurLingo() {
     }))
     saveLearningResults(completedResults)
     setResults(completedResults)
+  }
+
+  function unitCard(item: VocabularyUnit) {
+    return (
+      <article
+        className={`unit-card book-${bookNumber(item.book)}`}
+        key={unitKey(item)}
+      >
+        <div className="unit-card-top">
+          <span className="unit-book-label">{item.book}</span>
+          {space === 'parent' && (
+            <button
+              className="icon-button delete-button"
+              aria-label={`Delete ${item.book} ${unitLabel(item)}`}
+              title={`Delete ${item.book} ${unitLabel(item)}`}
+              onClick={() => deleteUnit(item)}
+            >
+              <Trash2 size={17} />
+            </button>
+          )}
+        </div>
+        <div className="unit-card-heading">
+          <span className="unit-number">{typeof item.unit === 'number' ? item.unit : <BookOpen size={24} />}</span>
+          <div>
+            <h2>{unitLabel(item)}</h2>
+            <p>
+              {item.title === unitLabel(item)
+                ? item.book
+                : item.title}
+            </p>
+          </div>
+        </div>
+        <UnitCardProgress
+          unit={item}
+          progress={learningProgress}
+        />
+        <div className="unit-card-details">
+          <span>{item.entries.length} words & phrases</span>
+          <span
+            className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
+          >
+            <span />
+            {item.reviewStatus !== 'approved'
+              ? 'Awaiting review'
+              : space === 'kid' &&
+                  isUnitCompleted(item, learningProgress)
+                ? 'Completed'
+                : earlierLibraryUnits.includes(item)
+                  ? 'Earlier unit'
+                  : progressionActive && typeof item.unit === 'number'
+                    ? 'Up next'
+                    : 'Ready'}
+          </span>
+        </div>
+        <button
+          className={`button ${space === 'kid' ? 'primary' : 'secondary'} unit-action`}
+          disabled={
+            space === 'kid' && item.reviewStatus !== 'approved'
+          }
+          aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} ${unitLabel(item)}`}
+          onClick={() => selectUnit(item)}
+        >
+          {space === 'kid' ? (
+            <Sparkles size={17} />
+          ) : (
+            <ClipboardCheck size={17} />
+          )}
+          {space === 'kid' ? 'Practise' : 'Review vocabulary'}
+          <ArrowRight size={17} />
+        </button>
+      </article>
+    )
   }
 
   const visibleEntries = entries
@@ -1544,73 +1689,20 @@ export default function OurLingo() {
                     </p>
                   </article>
                 ) : (
-                  <article
-                    className={`unit-card book-${bookNumber(item.book)}`}
-                    key={unitKey(item)}
-                  >
-                    <div className="unit-card-top">
-                      <span className="unit-book-label">{item.book}</span>
-                      {space === 'parent' && (
-                        <button
-                          className="icon-button delete-button"
-                          aria-label={`Delete ${item.book} ${unitLabel(item)}`}
-                          title={`Delete ${item.book} ${unitLabel(item)}`}
-                          onClick={() => deleteUnit(item)}
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="unit-card-heading">
-                      <span className="unit-number">{typeof item.unit === 'number' ? item.unit : <BookOpen size={24} />}</span>
-                      <div>
-                        <h2>{unitLabel(item)}</h2>
-                        <p>
-                          {item.title === unitLabel(item)
-                            ? item.book
-                            : item.title}
-                        </p>
-                      </div>
-                    </div>
-                    <UnitCardProgress
-                      unit={item}
-                      progress={learningProgress}
-                    />
-                    <div className="unit-card-details">
-                      <span>{item.entries.length} words & phrases</span>
-                      <span
-                        className={`status-badge ${item.reviewStatus === 'approved' ? 'approved' : ''}`}
-                      >
-                        <span />
-                        {item.reviewStatus !== 'approved'
-                          ? 'Awaiting review'
-                          : space === 'kid' &&
-                              isUnitCompleted(item, learningProgress)
-                            ? 'Completed'
-                            : progressionActive && typeof item.unit === 'number'
-                              ? 'Up next'
-                              : 'Ready'}
-                      </span>
-                    </div>
-                    <button
-                      className={`button ${space === 'kid' ? 'primary' : 'secondary'} unit-action`}
-                      disabled={
-                        space === 'kid' && item.reviewStatus !== 'approved'
-                      }
-                      aria-label={`${space === 'kid' ? 'Practise' : 'Review'} ${item.book} ${unitLabel(item)}`}
-                      onClick={() => selectUnit(item)}
-                    >
-                      {space === 'kid' ? (
-                        <Sparkles size={17} />
-                      ) : (
-                        <ClipboardCheck size={17} />
-                      )}
-                      {space === 'kid' ? 'Practise' : 'Review vocabulary'}
-                      <ArrowRight size={17} />
-                    </button>
-                  </article>
+                  unitCard(item)
                 ))}
               </div>
+              {earlierLibraryUnits.length > 0 && (
+                <details className="earlier-units">
+                  <summary>
+                    Earlier units ({earlierLibraryUnits.length})
+                    <span>Practise them anytime, for example to complete the whole book.</span>
+                  </summary>
+                  <div className="unit-grid">
+                    {earlierLibraryUnits.map((item) => unitCard(item))}
+                  </div>
+                </details>
+              )}
               {!libraryUnits.length && (
                 <div className="empty-state">
                   <BookOpen size={30} />
@@ -1832,6 +1924,29 @@ export default function OurLingo() {
                     </label>
                   ))}
                 </div>
+                {settings.progression === 'completed-and-next' && (
+                  <div className="start-units" role="group" aria-label="Start units">
+                    <p>
+                      Start each book at the unit the class is on. Earlier units
+                      stay available to practise.
+                    </p>
+                    {preferredBooks.map((book) =>
+                      startUnitPicker(
+                        book,
+                        settings.startUnits[book] ?? 1,
+                        (start) =>
+                          updateSettings({
+                            ...settings,
+                            startUnits: withStartUnit(
+                              settings.startUnits,
+                              book,
+                              start,
+                            ),
+                          }),
+                      ),
+                    )}
+                  </div>
+                )}
               </fieldset>
             </section>
           )}
@@ -2834,6 +2949,20 @@ export default function OurLingo() {
                 )
               })}
             </div>
+            {firstBooks.length > 0 && (
+              <div className="start-units" role="group" aria-label="Start units">
+                <p>Which unit is your class on?</p>
+                {books
+                  .filter((book) => firstBooks.includes(book))
+                  .map((book) =>
+                    startUnitPicker(book, firstStartUnits[book] ?? 1, (start) =>
+                      setFirstStartUnits((previous) =>
+                        withStartUnit(previous, book, start),
+                      ),
+                    ),
+                  )}
+              </div>
+            )}
             <p className="welcome-note">
               <SettingsIcon size={15} />
               You can change this later in Settings.

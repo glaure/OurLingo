@@ -9,6 +9,7 @@ test('settings default to the system theme and every book', () => {
     theme: 'system',
     books: [...books],
     progression: 'completed-and-next',
+    startUnits: {},
   })
   assert.deepEqual(normalizeSettings(null), defaultSettings())
   assert.deepEqual(normalizeSettings('broken'), defaultSettings())
@@ -26,6 +27,7 @@ test('settings keep a valid theme and preferred books in book order', () => {
       theme: 'dark',
       books: ['MORE! 1', 'MORE! 2'],
       progression: 'completed-and-next',
+      startUnits: {},
     },
   )
   assert.deepEqual(
@@ -40,8 +42,21 @@ test('settings keep a valid theme and preferred books in book order', () => {
       theme: 'light',
       books: ['MORE! 2'],
       progression: 'completed-and-next',
+      startUnits: {},
     },
   )
+})
+
+test('start units keep valid unit numbers for known books', () => {
+  assert.deepEqual(
+    normalizeSettings({
+      books: [...books],
+      knownBooks: [...books],
+      startUnits: { 'MORE! 2': 5, 'MORE! 3': 1, 'MORE! 4': 2.5, 'MORE! 9': 3 },
+    }).startUnits,
+    { 'MORE! 2': 5 },
+  )
+  assert.deepEqual(normalizeSettings({ startUnits: 'x' }).startUnits, {})
 })
 
 test('settings drop unknown values without hiding the library', () => {

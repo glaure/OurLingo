@@ -20,6 +20,7 @@ import {
   mergeBundledUnits,
   practiceEntries,
   progressionUnits,
+  earlierUnits,
   promptText,
   unitKey,
   unitLabel,
@@ -696,6 +697,28 @@ test('a unit is completed when every word is known and progression offers the ne
     'MORE! 2:irregular-verbs',
   ])
   assert.equal(isUnitCompleted({ ...one, entries: [] }, throughThree), false)
+
+  // A class that started at Unit 3 skips ahead; Units 1 and 2 stay available
+  // as earlier units, and completing them still keeps them in the list.
+  const start = { 'MORE! 1': 3 }
+  const startKeys = (progress: LearningProgress) =>
+    progressionUnits(units, progress, start).map(unitKey)
+  assert.deepEqual(startKeys(empty), ['MORE! 1:3', 'MORE! 2:1', 'MORE! 2:irregular-verbs'])
+  assert.deepEqual(earlierUnits(units, empty, start).map(unitKey), ['MORE! 1:2', 'MORE! 1:1'])
+  assert.deepEqual(startKeys(know(empty, three)), [
+    'MORE! 1:3',
+    'MORE! 1:5',
+    'MORE! 2:1',
+    'MORE! 2:irregular-verbs',
+  ])
+  assert.deepEqual(startKeys(know(empty, one)), [
+    'MORE! 1:3',
+    'MORE! 1:1',
+    'MORE! 2:1',
+    'MORE! 2:irregular-verbs',
+  ])
+  assert.deepEqual(earlierUnits(units, know(empty, one), start).map(unitKey), ['MORE! 1:2'])
+  assert.deepEqual(earlierUnits(units, empty).map(unitKey), [])
 })
 
 test('description practice uses English answers, shared descriptions and bundled suggestions', () => {

@@ -273,11 +273,13 @@ export function summarizeUnitProgress(
 }
 
 // Completed units stay available for revision, and each book also offers its
-// first unfinished approved unit. Irregular Verbs is a reference list used
-// alongside every unit, so it is always offered.
+// first unfinished approved unit from its start unit on (Unit 1 unless the
+// class started later). Irregular Verbs is a reference list used alongside
+// every unit, so it is always offered.
 export function progressionUnits(
   units: VocabularyUnit[],
   progress: LearningProgress,
+  startUnits: Partial<Record<Book, number>> = {},
 ): VocabularyUnit[] {
   const upcoming = new Set<string>()
   for (const book of books) {
@@ -286,6 +288,7 @@ export function progressionUnits(
         (unit) =>
           unit.book === book &&
           typeof unit.unit === 'number' &&
+          unit.unit >= (startUnits[book] ?? 1) &&
           unit.reviewStatus === 'approved' &&
           !isUnitCompleted(unit, progress),
       )
@@ -297,6 +300,22 @@ export function progressionUnits(
       unit.unit === 'irregular-verbs' ||
       upcoming.has(unitKey(unit)) ||
       isUnitCompleted(unit, progress),
+  )
+}
+
+// Unfinished units before a book's start unit. They stay available to
+// practise, for example to complete the whole book.
+export function earlierUnits(
+  units: VocabularyUnit[],
+  progress: LearningProgress,
+  startUnits: Partial<Record<Book, number>> = {},
+): VocabularyUnit[] {
+  return units.filter(
+    (unit) =>
+      typeof unit.unit === 'number' &&
+      unit.unit < (startUnits[unit.book] ?? 1) &&
+      unit.reviewStatus === 'approved' &&
+      !isUnitCompleted(unit, progress),
   )
 }
 

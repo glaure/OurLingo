@@ -3079,3 +3079,68 @@ progress::-moz-progress-bar {
   --medal: #bd97e8;
   --medal-soft: #382c4a;
 }
+
+/* Start units for "Completed + next" and earlier units in kid space. */
+.start-units {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  text-align: left;
+}
+.start-units > p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.welcome .start-units > p {
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 15px;
+}
+.start-unit {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 600;
+}
+.start-unit .book-spine {
+  width: 28px;
+  height: 32px;
+  font-size: 14px;
+}
+.start-unit select {
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.earlier-units {
+  margin-top: 22px;
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+}
+.earlier-units summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  cursor: pointer;
+  font: 500 20px var(--heading);
+  margin-bottom: 14px;
+}
+.earlier-units summary span {
+  font: 400 14px 'DM Sans Variable', 'DM Sans', sans-serif;
+  color: var(--muted);
+}
+:where(:root[data-theme='dark']) .start-unit,
+:where(:root[data-theme='dark']) .start-unit select {
+  background: #1d2923;
+  border-color: #3c5044;
+  color: var(--ink);
+}

@@ -10,6 +10,9 @@ export interface Settings {
   books: Book[]
   // Which units kid space shows; parent space always shows every unit.
   progression: UnitProgression
+  // Unit where "Completed + next" starts for each book, e.g. the unit the
+  // class is on. Books without an entry start at Unit 1.
+  startUnits: Partial<Record<Book, number>>
 }
 
 export const settingsStorageKey = 'ourlingo.settings.v1'
@@ -22,6 +25,7 @@ export function defaultSettings(): Settings {
     theme: 'system',
     books: [...books],
     progression: 'completed-and-next',
+    startUnits: {},
   }
 }
 
@@ -52,11 +56,22 @@ export function normalizeSettings(value: unknown): Settings {
   )
     ? (saved.progression as UnitProgression)
     : defaults.progression
+  const savedStarts =
+    saved.startUnits && typeof saved.startUnits === 'object'
+      ? (saved.startUnits as Record<string, unknown>)
+      : {}
+  const startUnits: Partial<Record<Book, number>> = {}
+  for (const book of books) {
+    const start = savedStarts[book]
+    if (Number.isInteger(start) && Number(start) > 1 && Number(start) <= 99)
+      startUnits[book] = Number(start)
+  }
   return {
     schemaVersion: 1,
     theme,
     books: preferred.length ? preferred : defaults.books,
     progression,
+    startUnits,
   }
 }
 

@@ -1985,3 +1985,53 @@ test('trophies show the streak, recently learned words and badges', async ({
   await page.getByRole('button', { name: 'Trophies', exact: true }).click()
   await expect(page.locator('.streak-card')).toContainText('3 days in a row')
 })
+
+test('a class that is further on starts at its unit and keeps earlier units to practise @first-start', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const welcome = page.getByRole('dialog')
+  await welcome.getByRole('checkbox', { name: /MORE! 2/ }).check()
+  await expect(welcome.getByText('Which unit is your class on?')).toBeVisible()
+  await welcome.getByLabel('MORE! 2 start unit').selectOption('5')
+  await welcome.getByRole('button', { name: "Let's start" }).click()
+
+  const cards = page.locator('.library-section > .unit-grid > .unit-card:not(.locked)')
+  await expect(cards).toHaveCount(2)
+  await expect(
+    cards.filter({ hasText: 'Unit 5' }).getByText('Up next', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('article', { name: 'MORE! 2 Unit 6 locked' }),
+  ).toContainText('Complete Unit 5 to unlock')
+  const earlier = page.locator('.earlier-units')
+  await expect(earlier.locator('summary')).toContainText('Earlier units (4)')
+  await expect(
+    page.getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true }),
+  ).toBeHidden()
+  await earlier.locator('summary').click()
+  await expect(
+    earlier.locator('.unit-card').filter({ hasText: 'Unit 1' }).getByText('Earlier unit'),
+  ).toBeVisible()
+  await page
+    .getByRole('button', { name: 'Practise MORE! 2 Unit 1', exact: true })
+    .click()
+  await expect(page.getByText('MORE! 2 · Unit 1 · ', { exact: false })).toBeVisible()
+
+  await page.getByRole('button', { name: 'My units', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const start = page.getByLabel('MORE! 2 start unit')
+  await expect(start).toHaveValue('5')
+  await start.selectOption('3')
+  await page.getByRole('button', { name: /^My units/ }).click()
+  await expect(
+    cards.filter({ hasText: 'Unit 3' }).getByText('Up next', { exact: true }),
+  ).toBeVisible()
+  await expect(page.locator('.earlier-units summary')).toContainText('Earlier units (2)')
+  await page.reload()
+  await expect(page.locator('.earlier-units summary')).toContainText('Earlier units (2)')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('radio', { name: 'All units', exact: true }).check()
+  await expect(page.getByLabel('MORE! 2 start unit')).toHaveCount(0)
+})
