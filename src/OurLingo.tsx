@@ -434,12 +434,12 @@ export default function OurLingo() {
     practiceMode === 'matching'
       ? [
           { value: 'english', from: 'English', to: '+ Deutsch' },
-          { value: 'description', from: 'English', to: '+ Description' },
+          { value: 'description', from: 'English', to: '+ Definition' },
         ]
       : [
           { value: 'english', from: 'Deutsch', to: '→ English' },
           { value: 'german', from: 'English', to: '→ Deutsch' },
-          { value: 'description', from: 'Description', to: '→ English' },
+          { value: 'description', from: 'Definition', to: '→ English' },
         ]
 
   useEffect(() => {
@@ -899,7 +899,7 @@ export default function OurLingo() {
       if (!boards.length) {
         setWarning(
           direction === 'description'
-            ? 'Matching descriptions needs at least two words with distinct descriptions. A parent can add descriptions in Review vocabulary.'
+            ? 'Matching definitions needs at least two words with distinct definitions. A parent can add definitions in Review vocabulary.'
             : 'Matching pairs needs at least two distinct translations. You can still use typed answers.',
         )
         return
@@ -921,7 +921,7 @@ export default function OurLingo() {
     const askable = practiceEntries(words, direction)
     if (!askable.length) {
       setWarning(
-        'None of these words has a description yet. A parent can add descriptions in Review vocabulary.',
+        'None of these words has a definition yet. A parent can add definitions in Review vocabulary.',
       )
       return
     }
@@ -2010,7 +2010,7 @@ export default function OurLingo() {
                     <span>ENGLISH</span>
                     <span>DEUTSCH</span>
                     <span>EXAMPLE SENTENCE</span>
-                    <span>DESCRIPTION</span>
+                    <span>DEFINITION</span>
                     <span />
                   </div>
                   {visibleEntries.map(({ entry, index }) => (
@@ -2063,11 +2063,11 @@ export default function OurLingo() {
                         />
                       </label>
                       <label className="entry-field description-field">
-                        <span className="mobile-label">Description</span>
+                        <span className="mobile-label">Definition</span>
                         <textarea
                           rows={2}
-                          aria-label={`Description entry ${index + 1}`}
-                          placeholder="No description"
+                          aria-label={`Definition entry ${index + 1}`}
+                          placeholder="No definition"
                           value={entry.description || ''}
                           onChange={(event) =>
                             updateEntry(index, 'description', event.target.value)
@@ -2075,7 +2075,7 @@ export default function OurLingo() {
                         />
                         {entry.descriptionSource === 'suggested' && (
                           <span className="entry-origin">
-                            Suggested description
+                            Suggested definition
                           </span>
                         )}
                       </label>
@@ -2334,8 +2334,8 @@ export default function OurLingo() {
                     describedEntries.length < entries.length && (
                       <p className="direction-note">
                         {describedEntries.length
-                          ? `${describedEntries.length} of ${entries.length} words have a description.`
-                          : 'No word in this unit has a description yet.'}
+                          ? `${describedEntries.length} of ${entries.length} words have a definition.`
+                          : 'No word in this unit has a definition yet.'}
                       </p>
                     )}
                   {practiceMode !== 'matching' && (
@@ -2391,7 +2391,7 @@ export default function OurLingo() {
                           side === 'english'
                             ? 'English matching words'
                             : matchingDescriptions
-                              ? 'Description matching clues'
+                              ? 'Definition matching clues'
                               : 'German matching words'
                         }
                         key={side}
@@ -2400,7 +2400,7 @@ export default function OurLingo() {
                           {side === 'english'
                             ? 'English'
                             : matchingDescriptions
-                              ? 'Description'
+                              ? 'Definition'
                               : 'Deutsch'}
                         </h2>
                         <div className="matching-tiles">
@@ -2426,7 +2426,7 @@ export default function OurLingo() {
                                 className={`matching-tile ${matched ? 'matched' : ''} ${selected ? 'selected' : ''} ${incorrect ? 'incorrect' : ''} ${side === 'german' && matchingDescriptions ? 'description-tile' : ''}`}
                                 disabled={matched}
                                 aria-pressed={selected}
-                                aria-label={`${side === 'english' ? 'English' : matchingDescriptions ? 'Description' : 'Deutsch'}: ${matchingText(round[index], side)}${matched ? ' (matched)' : ''}`}
+                                aria-label={`${side === 'english' ? 'English' : matchingDescriptions ? 'Definition' : 'Deutsch'}: ${matchingText(round[index], side)}${matched ? ' (matched)' : ''}`}
                                 lang={
                                   side === 'german' && !matchingDescriptions
                                     ? 'de'
@@ -2513,7 +2513,7 @@ export default function OurLingo() {
                         ? 'DEUTSCH'
                         : direction === 'german'
                           ? 'ENGLISH'
-                          : 'DESCRIPTION'}
+                          : 'DEFINITION'}
                     </span>
                     <h2
                       className={`question-word ${direction === 'description' ? 'question-description' : ''}`}

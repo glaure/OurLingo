@@ -1524,7 +1524,7 @@ test('completed + next shows finished units for revision and unlocks the next un
   await expect(unitCards).toHaveCount(15)
 })
 
-test('description practice asks for the English word in typed, multiple choice and matching modes', async ({
+test('definition practice asks for the English word in typed, multiple choice and matching modes', async ({
   page,
 }) => {
   const unitThree = moreOneFixtures.find((fixture) => fixture.unit === 3)!
@@ -1538,9 +1538,9 @@ test('description practice asks for the English word in typed, multiple choice a
     .click()
 
   await page.getByText('Type answer', { exact: true }).click()
-  await page.getByRole('radio', { name: 'Description → English', exact: true }).check()
+  await page.getByRole('radio', { name: 'Definition → English', exact: true }).check()
   await page.getByRole('button', { name: 'Start practice' }).click()
-  await expect(page.getByText('DESCRIPTION', { exact: true })).toBeVisible()
+  await expect(page.getByText('DEFINITION', { exact: true })).toBeVisible()
   const typed = byDescription.get(
     (await page.locator('.question-word').textContent())!,
   )!
@@ -1553,7 +1553,7 @@ test('description practice asks for the English word in typed, multiple choice a
 
   await page.getByText('Multiple choice', { exact: true }).click()
   await expect(
-    page.getByRole('radio', { name: 'Description → English', exact: true }),
+    page.getByRole('radio', { name: 'Definition → English', exact: true }),
   ).toBeChecked()
   await page.getByRole('button', { name: 'Start practice' }).click()
   const chosen = byDescription.get(
@@ -1568,9 +1568,9 @@ test('description practice asks for the English word in typed, multiple choice a
   await page.getByRole('button', { name: 'Back to practice' }).click()
 
   await page.getByText('Matching pairs', { exact: true }).click()
-  await page.getByRole('radio', { name: 'English + Description', exact: true }).check()
+  await page.getByRole('radio', { name: 'English + Definition', exact: true }).check()
   await page.getByRole('button', { name: 'Start practice' }).click()
-  const clues = page.getByRole('group', { name: 'Description matching clues' })
+  const clues = page.getByRole('group', { name: 'Definition matching clues' })
   await expect(clues.getByRole('button')).toHaveCount(5)
   const clue = clues.getByRole('button').first()
   const clueText = (await clue.locator('span').first().textContent())!
@@ -1588,7 +1588,7 @@ test('description practice asks for the English word in typed, multiple choice a
   ).toBe(true)
 })
 
-test('saved libraries receive suggested descriptions without replacing cleared ones', async ({
+test('saved libraries receive suggested definitions without replacing cleared ones', async ({
   page,
 }) => {
   await page.addInitScript(
@@ -1633,13 +1633,13 @@ test('saved libraries receive suggested descriptions without replacing cleared o
     .getByRole('button', { name: 'Review MORE! 1 Unit 1', exact: true })
     .click()
   await expect(
-    page.getByText('Suggested description', { exact: true }),
+    page.getByText('Suggested definition', { exact: true }),
   ).toHaveCount(unit.entries.length - 1)
   await page
-    .getByLabel('Description entry 2', { exact: true })
+    .getByLabel('Definition entry 2', { exact: true })
     .fill('A clue written by a parent')
   await expect(
-    page.getByText('Suggested description', { exact: true }),
+    page.getByText('Suggested definition', { exact: true }),
   ).toHaveCount(unit.entries.length - 2)
   await page.getByRole('button', { name: 'Save & approve' }).click()
   await expect(page.getByRole('status')).toContainText('approved and saved')
@@ -1756,7 +1756,7 @@ test('first start asks for the book, mentions Settings and defaults to completed
   await expect(page.getByRole('checkbox', { name: 'MORE! 1' })).not.toBeChecked()
 })
 
-test('the button to go on stays visible on a phone during long description boards', async ({
+test('the button to go on stays visible on a phone during long definition boards', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -1766,7 +1766,7 @@ test('the button to go on stays visible on a phone during long description board
     .click()
   await page.getByText('Matching pairs', { exact: true }).click()
   await page
-    .getByRole('radio', { name: 'English + Description', exact: true })
+    .getByRole('radio', { name: 'English + Definition', exact: true })
     .check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   const next = page.getByRole('button', { name: 'Next board', exact: true })
@@ -1776,7 +1776,7 @@ test('the button to go on stays visible on a phone during long description board
   await page.getByRole('button', { name: 'Back to practice' }).click()
   await page.getByText('Multiple choice', { exact: true }).click()
   await page
-    .getByRole('radio', { name: 'Description → English', exact: true })
+    .getByRole('radio', { name: 'Definition → English', exact: true })
     .check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   await expect(
@@ -1821,7 +1821,7 @@ test('on a tablet held sideways the practice buttons stay visible', async ({
   ).toBeInViewport()
   await page.getByText('Matching pairs', { exact: true }).click()
   await page
-    .getByRole('radio', { name: 'English + Description', exact: true })
+    .getByRole('radio', { name: 'English + Definition', exact: true })
     .check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   await expect(

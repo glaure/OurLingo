@@ -84,10 +84,10 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
   await page.evaluate(() => window.scrollTo(0, 0))
   await shot('02-practice-setup')
 
-  // 3. Description question in multiple choice, answered correctly.
+  // 3. Definition question in multiple choice, answered correctly.
   await page.getByText('Multiple choice', { exact: true }).click()
   await page
-    .getByRole('radio', { name: 'Description → English', exact: true })
+    .getByRole('radio', { name: 'Definition → English', exact: true })
     .check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   const clue = await page.locator('.question-word').textContent()
@@ -104,7 +104,7 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
   // 4. Matching words with descriptions, one pair already found.
   await page.getByText('Matching pairs', { exact: true }).click()
   await page
-    .getByRole('radio', { name: 'English + Description', exact: true })
+    .getByRole('radio', { name: 'English + Definition', exact: true })
     .check()
   await page.getByRole('button', { name: 'Start practice' }).click()
   const englishTiles = page
@@ -116,7 +116,7 @@ async function captureScreens(folder, viewport, deviceScaleFactor) {
     .getByRole('button', { name: `English: ${pair.english}`, exact: true })
     .click()
   await page
-    .getByRole('button', { name: `Description: ${pair.description}`, exact: true })
+    .getByRole('button', { name: `Definition: ${pair.description}`, exact: true })
     .click()
   await englishTiles.nth(1).click()
   await page.evaluate(() => window.scrollTo(0, 0))
