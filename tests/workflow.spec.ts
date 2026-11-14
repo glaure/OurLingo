@@ -1916,7 +1916,11 @@ test('the last missing word comes first, completes the unit and unlocks the next
     expect.arrayContaining(['first-round', 'perfect-round', 'units-1', 'words-10']),
   )
 
+  await expect(
+    page.locator('.unit-complete').getByRole('button', { name: 'Play the word game' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Start Unit 2' }).click()
+  await expect(page.getByRole('button', { name: 'Play the word game' })).toHaveCount(0)
   await expect(page.getByText('MORE! 1 · Unit 2 · ', { exact: false })).toBeVisible()
   await expect(page.locator('.unit-goal')).toContainText(
     `${unitTwo.entries.length} words to go.`,
@@ -2034,4 +2038,98 @@ test('a class that is further on starts at its unit and keeps earlier units to p
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('radio', { name: 'All units', exact: true }).check()
   await expect(page.getByLabel('MORE! 2 start unit')).toHaveCount(0)
+})
+
+test('the word game runs against the clock, keeps records and leaves progress alone', async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.addInitScript(
+    ({ entries }) => {
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      localStorage.setItem(
+        'ourlingo.learning.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          records: entries.map((entry) => ({
+            book: 'MORE! 1',
+            unit: 1,
+            english: entry.english,
+            german: entry.german,
+            correctAttempts: 3,
+            incorrectAttempts: 0,
+            correctStreak: 3,
+            lastPracticedAt: '2026-11-10T10:00:00.000Z',
+          })),
+        }),
+      )
+    },
+    { entries: unit.entries },
+  )
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }).click()
+  const progressBefore = await page.evaluate(() => localStorage.getItem('ourlingo.learning.v1'))
+  await page.getByRole('button', { name: 'Play the word game' }).click()
+  await expect(page.getByText('No record yet. Set the first one!')).toBeVisible()
+  await page.getByText('30 seconds', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start the game' }).click()
+  await expect(page.locator('.game-count')).toHaveText('3')
+  await page.clock.runFor(2500)
+
+  const english = page.getByRole('group', { name: 'English game words' })
+  const german = page.getByRole('group', { name: 'German game words' })
+  const words = await english.locator('.matching-tile > span:first-child').allTextContents()
+  expect(words).toHaveLength(5)
+  const germanFor = (text: string) => unit.entries.find((entry) => entry.english === text)!.german
+  // A wrong match costs two seconds and breaks the combo.
+  await english.getByRole('button', { name: `English: ${words[0]}`, exact: true }).click()
+  await german.getByRole('button', { name: `Deutsch: ${germanFor(words[1])}`, exact: true }).click()
+  await expect(page.locator('.game-flash.penalty')).toHaveText('-2s')
+  await expect(page.locator('.game-timer')).toHaveAccessibleName('Time left: 0:28')
+  for (const text of words) {
+    await english.getByRole('button', { name: `English: ${text}`, exact: true }).click()
+    await german.getByRole('button', { name: `Deutsch: ${germanFor(text)}`, exact: true }).click()
+  }
+  // Five in a row add two seconds, and a new board with other words appears.
+  await expect(page.locator('.game-flash.bonus')).toHaveText('+2s')
+  await expect(page.locator('.game-pairs')).toHaveAccessibleName('5 pairs')
+  await page.clock.runFor(400)
+  const nextWords = await english.locator('.matching-tile > span:first-child').allTextContents()
+  expect(nextWords).toHaveLength(5)
+  expect(nextWords.some((text) => words.includes(text))).toBe(false)
+
+  await page.clock.runFor(31_000)
+  await expect(page.getByRole('heading', { name: 'New record!' })).toBeVisible()
+  await expect(page.locator('.game-result .score')).toHaveText('5')
+  await expect(page.getByText('Best combo: 5')).toBeVisible()
+  await expect(page.locator('.game-result .new-badge')).toContainText('Game on!')
+  expect(await page.evaluate(() => localStorage.getItem('ourlingo.learning.v1'))).toBe(progressBefore)
+  const games = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('ourlingo.activity.v1')!).games,
+  )
+  expect(games.records['MORE! 1:1:30']).toBe(5)
+
+  await page.getByRole('button', { name: 'Change time' }).click()
+  await expect(page.getByText('Your record: 5 pairs in 30 seconds')).toBeVisible()
+  await page.getByText('60 seconds', { exact: true }).click()
+  await expect(page.getByText('No record yet. Set the first one!')).toBeVisible()
+
+  // Leaving a running game asks first.
+  await page.getByRole('button', { name: 'Start the game' }).click()
+  await page.clock.runFor(2500)
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'MORE! 1', exact: true }).click()
+  await expect(page.locator('.game-bar')).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Stop the game' }).click()
+  await expect(page.getByRole('heading', { name: 'Beat the clock!' })).toBeVisible()
+})
+
+test('the word game is only offered for completed units', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Practise MORE! 1 Unit 1', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Start practice' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Play the word game' })).toHaveCount(0)
 })

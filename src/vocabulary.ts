@@ -709,6 +709,25 @@ export function createMatchingBoards(
   return boards
 }
 
+// A new word game board: avoids the words of the previous board while the
+// unit has enough other words, so boards keep changing.
+export function nextGameBoard(
+  entries: Entry[],
+  previous: Entry[] = [],
+  direction: PracticeDirection = 'english',
+  size = 5,
+): Entry[] {
+  const fresh = createMatchingRound(
+    entries.filter((entry) => !previous.includes(entry)),
+    size,
+    [],
+    direction,
+  )
+  return fresh.length >= Math.min(size, 3)
+    ? fresh
+    : createMatchingRound(entries, size, [], direction)
+}
+
 // Picks words in random order. Words for which `later` is true (e.g. words
 // already known) are only used once all other words are in the round.
 export function createRound<T>(

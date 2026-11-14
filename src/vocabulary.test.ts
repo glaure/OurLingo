@@ -10,6 +10,7 @@ import {
   createMatchingRound,
   createRound,
   newlyKnownEntries,
+  nextGameBoard,
   isCorrectAnswer,
   isCorrectPracticeAnswer,
   isLearningProgress,
@@ -830,4 +831,15 @@ test('matching rounds use up to three boards of different words', () => {
     createMatchingBoards(described, 3, 5, [], 'description').map((board) => board.length),
     [4],
   )
+})
+
+test('word game boards change words and fall back to the whole unit', () => {
+  const first = nextGameBoard(unit.entries)
+  assert.equal(first.length, 5)
+  const second = nextGameBoard(unit.entries, first)
+  assert.equal(second.length, 5)
+  assert.equal(second.some((entry) => first.includes(entry)), false)
+  const small = unit.entries.slice(0, 4)
+  assert.equal(nextGameBoard(small, small.slice(0, 3)).length, 4)
+  assert.deepEqual(nextGameBoard(unit.entries.slice(0, 1)), [])
 })

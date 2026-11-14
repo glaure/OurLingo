@@ -28,6 +28,24 @@ export interface Activity {
   bestStreak: number
   // Badge id -> date it was earned.
   badges: Record<string, string>
+  // Word game results; just for fun, they do not change learning progress.
+  games?: GameStats
+}
+
+export interface GameStats {
+  played: number
+  bestPairs: number
+  bestCombo: number
+  // "book:unit:seconds" -> most pairs in one game.
+  records: Record<string, number>
+}
+
+export interface GameSummary {
+  book: VocabularyUnit['book']
+  unit: VocabularyUnit['unit']
+  seconds: number
+  pairs: number
+  bestCombo: number
 }
 
 export interface RoundSummary {
@@ -92,7 +110,14 @@ export function isActivity(value: unknown): value is Activity {
     Array.isArray(activity.modes) &&
     isCount(activity.bestStreak) &&
     !!activity.badges &&
-    typeof activity.badges === 'object'
+    typeof activity.badges === 'object' &&
+    (activity.games === undefined ||
+      (!!activity.games &&
+        isCount(activity.games.played) &&
+        isCount(activity.games.bestPairs) &&
+        isCount(activity.games.bestCombo) &&
+        !!activity.games.records &&
+        typeof activity.games.records === 'object'))
   )
 }
 
@@ -151,6 +176,35 @@ export function recordRound(activity: Activity, round: RoundSummary): Activity {
   }
 }
 
+export function gameRecordKey(
+  unit: Pick<VocabularyUnit, 'book' | 'unit'>,
+  seconds: number,
+): string {
+  return `${unit.book}:${unit.unit}:${seconds}`
+}
+
+export function gameRecord(
+  activity: Activity,
+  unit: Pick<VocabularyUnit, 'book' | 'unit'>,
+  seconds: number,
+): number {
+  return activity.games?.records[gameRecordKey(unit, seconds)] ?? 0
+}
+
+export function recordGame(activity: Activity, game: GameSummary): Activity {
+  const games = activity.games ?? { played: 0, bestPairs: 0, bestCombo: 0, records: {} }
+  const key = gameRecordKey(game, game.seconds)
+  return {
+    ...activity,
+    games: {
+      played: games.played + 1,
+      bestPairs: Math.max(games.bestPairs, game.pairs),
+      bestCombo: Math.max(games.bestCombo, game.bestCombo),
+      records: { ...games.records, [key]: Math.max(games.records[key] ?? 0, game.pairs) },
+    },
+  }
+}
+
 // Practice of the last `count` days, oldest first, including empty days.
 export function recentDays(
   activity: Activity,
@@ -180,6 +234,9 @@ export interface AchievementStats {
   rounds: number
   perfectRounds: number
   modes: number
+  gamesPlayed: number
+  gamePairs: number
+  gameCombo: number
 }
 
 // A book counts as completed when all of its numbered units are completed.
@@ -210,6 +267,9 @@ export function achievementStats(
     rounds: activity.rounds,
     perfectRounds: activity.perfectRounds,
     modes: activity.modes.length,
+    gamesPlayed: activity.games?.played ?? 0,
+    gamePairs: activity.games?.bestPairs ?? 0,
+    gameCombo: activity.games?.bestCombo ?? 0,
   }
 }
 
@@ -223,6 +283,8 @@ export type BadgeIcon =
   | 'flame'
   | 'shapes'
   | 'rocket'
+  | 'zap'
+  | 'gamepad'
 
 export interface Badge {
   id: string
@@ -291,6 +353,30 @@ export const badges: Badge[] = [
     icon: 'rocket',
     goal: 50,
     value: (stats) => stats.rounds,
+  },
+  {
+    id: 'game-first',
+    title: 'Game on!',
+    description: 'Play the word game',
+    icon: 'gamepad',
+    goal: 1,
+    value: (stats) => stats.gamesPlayed,
+  },
+  {
+    id: 'game-pairs-20',
+    title: 'Speedy',
+    description: 'Match 20 pairs in one word game',
+    icon: 'zap',
+    goal: 20,
+    value: (stats) => stats.gamePairs,
+  },
+  {
+    id: 'game-combo-10',
+    title: 'Lightning',
+    description: 'Match 10 pairs in a row in a word game',
+    icon: 'zap',
+    goal: 10,
+    value: (stats) => stats.gameCombo,
   },
   wordBadge(10, 'Word finder'),
   wordBadge(50, 'Word collector'),

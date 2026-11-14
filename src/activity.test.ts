@@ -7,7 +7,9 @@ import {
   dayStreak,
   emptyActivity,
   isActivity,
+  gameRecord,
   recentDays,
+  recordGame,
   recordRound,
 } from './activity.ts'
 import type { RoundSummary } from './activity.ts'
@@ -124,4 +126,27 @@ test('badges are awarded once from words, units and books', () => {
   assert.deepEqual(awardBadges(first.activity, stats, '2026-10-21').earned, [])
   const allDone = achievementStats([unit(1)], progress, activity, '2026-10-20')
   assert.deepEqual(allDone.completedBooks, ['MORE! 1'])
+})
+
+test('word games keep records per unit and length without touching practice days', () => {
+  const unit = { book: 'MORE! 1' as const, unit: 2 }
+  let activity = recordGame(emptyActivity(), { ...unit, seconds: 60, pairs: 12, bestCombo: 6 })
+  activity = recordGame(activity, { ...unit, seconds: 60, pairs: 9, bestCombo: 11 })
+  activity = recordGame(activity, { ...unit, seconds: 30, pairs: 7, bestCombo: 3 })
+  assert.equal(gameRecord(activity, unit, 60), 12)
+  assert.equal(gameRecord(activity, unit, 30), 7)
+  assert.equal(gameRecord(activity, unit, 90), 0)
+  assert.deepEqual(
+    { played: activity.games!.played, bestPairs: activity.games!.bestPairs, bestCombo: activity.games!.bestCombo },
+    { played: 3, bestPairs: 12, bestCombo: 11 },
+  )
+  assert.deepEqual(activity.days, [])
+  assert.equal(activity.rounds, 0)
+  assert.equal(isActivity(activity), true)
+  assert.equal(isActivity({ ...activity, games: { played: 'x' } }), false)
+  const stats = achievementStats([], { schemaVersion: 1, records: [] }, activity, '2026-11-14')
+  assert.deepEqual(
+    awardBadges(activity, stats, '2026-11-14').earned.map((badge) => badge.id),
+    ['game-first', 'game-combo-10'],
+  )
 })

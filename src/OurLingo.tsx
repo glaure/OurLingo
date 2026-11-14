@@ -11,9 +11,7 @@ import {
   CloudOff,
   FileCheck2,
   Flame,
-  Footprints,
   Gem,
-  Crown,
   GraduationCap,
   Languages,
   Keyboard,
@@ -22,14 +20,13 @@ import {
   LoaderCircle,
   Lock,
   Plus,
-  Rocket,
   RotateCcw,
   Search,
-  Shapes,
   Settings as SettingsIcon,
   Sparkles,
   Star,
   Target,
+  Timer,
   Trash2,
   Trophy,
   Users,
@@ -91,12 +88,17 @@ import {
   badges,
   dayStreak,
   emptyActivity,
+  gameRecord,
   isActivity,
   localDate,
   recentDays,
+  recordGame,
   recordRound,
 } from './activity'
-import type { Activity, Badge, BadgeIcon } from './activity'
+import type { Activity, Badge } from './activity'
+import { BadgeMedal, Confetti } from './Rewards'
+import WordGame from './WordGame'
+import type { GameResult } from './WordGame'
 import './OurLingo.css'
 
 type View =
@@ -144,48 +146,13 @@ const resultTitles = [
   'Great job!',
   'Amazing, every word right!',
 ]
-const confettiColours = ['#f6c344', '#ef7d57', '#5fb98c', '#5aa9e6', '#b784e0', '#f28ab2']
+
 
 // Stars for a finished round: 3 for a perfect round, 2 from 70 %, 1 from 40 %.
 function roundStars(correct: number, total: number): number {
   if (!total) return 0
   const share = correct / total
   return share === 1 ? 3 : share >= 0.7 ? 2 : share >= 0.4 ? 1 : 0
-}
-
-function Confetti() {
-  const [pieces] = useState(() =>
-    Array.from({ length: 48 }, (_, index) => ({
-      left: Math.random() * 100,
-      delay: Math.random() * 0.6,
-      duration: 1.8 + Math.random() * 1.4,
-      size: 6 + Math.random() * 7,
-      rotate: Math.random() * 360,
-      drift: Math.random() * 80 - 40,
-      colour: confettiColours[index % confettiColours.length],
-      round: index % 3 === 0,
-    })),
-  )
-  return (
-    <div className="confetti" aria-hidden="true">
-      {pieces.map((piece, index) => (
-        <span
-          key={index}
-          style={{
-            left: `${piece.left}%`,
-            width: piece.size,
-            height: piece.round ? piece.size : piece.size * 0.45,
-            background: piece.colour,
-            borderRadius: piece.round ? '50%' : 2,
-            animationDelay: `${piece.delay}s`,
-            animationDuration: `${piece.duration}s`,
-            ['--rotate' as string]: `${piece.rotate}deg`,
-            ['--drift' as string]: `${piece.drift}px`,
-          }}
-        />
-      ))}
-    </div>
-  )
 }
 
 const emptyUnit: VocabularyUnit = {
@@ -238,30 +205,6 @@ const progressionLabels: Record<UnitProgression, string> = {
   'completed-and-next': 'Completed + next',
 }
 
-const badgeIcons: Record<BadgeIcon, typeof Star> = {
-  footprints: Footprints,
-  star: Star,
-  gem: Gem,
-  book: BookOpen,
-  trophy: Trophy,
-  crown: Crown,
-  flame: Flame,
-  shapes: Shapes,
-  rocket: Rocket,
-}
-
-function BadgeMedal({ badge }: { badge: Badge }) {
-  const Icon = badgeIcons[badge.icon]
-  return (
-    <span
-      className={`badge-medal ${badge.book ? `book-${bookNumber(badge.book)}` : `badge-${badge.icon}`}`}
-      aria-hidden="true"
-    >
-      <Icon size={24} strokeWidth={2.2} />
-    </span>
-  )
-}
-
 function dayLabel(date: string, today: string): string {
   if (date === today) return 'Today'
   const [year, month, day] = date.split('-').map(Number)
@@ -305,6 +248,8 @@ export default function OurLingo() {
     useState<LearningProgress>(loadLearningProgress)
   const [activity, setActivity] = useState<Activity>(loadActivity)
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
+  const [gameOpen, setGameOpen] = useState(false)
+  const [gamePlaying, setGamePlaying] = useState(false)
   const [unit, setUnit] = useState<VocabularyUnit | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [loadError, setLoadError] = useState('')
@@ -725,6 +670,11 @@ export default function OurLingo() {
       )
     )
       return false
+    if (
+      gamePlaying &&
+      !window.confirm('Stop the game? This game will not be saved.')
+    )
+      return false
     return true
   }
 
@@ -935,6 +885,8 @@ export default function OurLingo() {
 
   function resetRound() {
     setRoundOutcome(null)
+    setGameOpen(false)
+    setGamePlaying(false)
     setRound([])
     setRoundChoices([])
     setResults([])
@@ -1137,6 +1089,40 @@ export default function OurLingo() {
     }
   }
 
+  function openGame() {
+    resetRound()
+    setGameOpen(true)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
+  // The word game is just for fun: it saves records and badges, not progress.
+  function saveGame(result: GameResult): Badge[] {
+    if (!unit) return []
+    const today = localDate()
+    const before = awardBadges(
+      activity,
+      achievementStats(library?.units ?? [], learningProgress, activity, today),
+      today,
+    ).activity
+    const played = recordGame(before, {
+      book: unit.book,
+      unit: unit.unit,
+      ...result,
+    })
+    const awarded = awardBadges(
+      played,
+      achievementStats(library?.units ?? [], learningProgress, played, today),
+      today,
+    )
+    setActivity(awarded.activity)
+    try {
+      localStorage.setItem(activityStorageKey, JSON.stringify(awarded.activity))
+    } catch {
+      setWarning('The game finished, but the record could not be saved on this device.')
+    }
+    return awarded.earned
+  }
+
   // Every word appears on exactly one board, so its first try decides its score.
   function finishMatchingBoard() {
     if (!boardComplete) return
@@ -1249,7 +1235,7 @@ export default function OurLingo() {
 
   return (
     <div
-      className={`app-shell ${practiceMode === 'matching' && round.length > 0 && !complete ? 'matching-active' : ''} ${view === 'practice' ? 'practice-view' : ''} ${unitView && unit ? `book-${bookNumber(unit.book)}` : ''}`}
+      className={`app-shell ${(practiceMode === 'matching' && round.length > 0 && !complete) || gamePlaying ? 'matching-active' : ''} ${view === 'practice' ? 'practice-view' : ''} ${unitView && unit ? `book-${bookNumber(unit.book)}` : ''}`}
     >
       <aside className="sidebar">
         <a
@@ -2285,7 +2271,17 @@ export default function OurLingo() {
           )}
           {unit && view === 'practice' && (
             <section className="practice-section">
-              {!round.length && (
+              {gameOpen && (
+                <WordGame
+                  unit={unit}
+                  entries={entries}
+                  record={(seconds) => gameRecord(activity, unit, seconds)}
+                  onFinish={saveGame}
+                  onExit={() => setGameOpen(false)}
+                  onPlayingChange={setGamePlaying}
+                />
+              )}
+              {!round.length && !gameOpen && (
                 <div className="practice-setup">
                   <button
                     type="button"
@@ -2334,7 +2330,8 @@ export default function OurLingo() {
                         {unitCompleted ? (
                           <>
                             <strong>Unit completed!</strong> Practise again
-                            anytime to keep the words fresh.
+                            anytime to keep the words fresh, or beat the clock
+                            in the word game.
                           </>
                         ) : (
                           <>
@@ -2348,6 +2345,16 @@ export default function OurLingo() {
                         )}
                       </span>
                     </div>
+                    {unitCompleted && (
+                      <button
+                        type="button"
+                        className="button secondary game-button"
+                        onClick={openGame}
+                      >
+                        <Timer size={17} />
+                        Play the word game
+                      </button>
+                    )}
                     <p>
                       {unitSummary.lastPracticedAt ? (
                         <>
@@ -2797,15 +2804,24 @@ export default function OurLingo() {
                               ? `You know all ${roundOutcome.total} words. ${roundOutcome.nextUnit.book} ${unitLabel(roundOutcome.nextUnit)} is unlocked.`
                               : `You know all ${roundOutcome.total} words.`}
                           </span>
-                          {roundOutcome.nextUnit && (
+                          <div className="result-actions">
+                            {roundOutcome.nextUnit && (
+                              <button
+                                className="button primary"
+                                onClick={() => selectUnit(roundOutcome.nextUnit!)}
+                              >
+                                Start {unitLabel(roundOutcome.nextUnit)}
+                                <ArrowRight size={17} />
+                              </button>
+                            )}
                             <button
-                              className="button primary"
-                              onClick={() => selectUnit(roundOutcome.nextUnit!)}
+                              className="button secondary"
+                              onClick={openGame}
                             >
-                              Start {unitLabel(roundOutcome.nextUnit)}
-                              <ArrowRight size={17} />
+                              <Timer size={17} />
+                              Play the word game
                             </button>
-                          )}
+                          </div>
                         </div>
                       ) : (
                         <div className="unit-progress-result">
