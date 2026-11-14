@@ -3331,3 +3331,122 @@ progress::-moz-progress-bar {
 :where(:root[data-theme='dark']) .game-flash.penalty {
   color: #e8837d;
 }
+
+/* Weekly learning report for parents. */
+.report-due {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px 12px;
+  margin: -6px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #b9d7c6;
+  border-radius: 16px;
+  background: var(--mint);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.report-due > svg {
+  color: var(--green);
+  margin-top: 1px;
+}
+.report-due > div {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.weekly-report-settings {
+  display: grid;
+  gap: 12px;
+}
+.report-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+}
+.report-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green);
+}
+.report-emails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.report-emails label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 0;
+}
+.report-emails input {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+  min-width: 0;
+}
+.field-error {
+  color: #b5452f;
+  font-size: 13px;
+}
+.this-week {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 26px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.this-week-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.this-week-heading h2 {
+  font: 500 24px var(--heading);
+}
+.this-week-heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.report-preview {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--mint);
+  font: 13px/1.55 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+@media (max-width: 600px) {
+  .report-emails {
+    grid-template-columns: 1fr;
+  }
+}
+:where(:root[data-theme='dark']) .report-due {
+  border-color: #3c5044;
+}
+:where(:root[data-theme='dark']) .report-emails input,
+:where(:root[data-theme='dark']) .this-week {
+  background: #1d2923;
+  border-color: #3c5044;
+  color: var(--ink);
+}
+:where(:root[data-theme='dark']) .field-error {
+  color: #e8837d;
+}

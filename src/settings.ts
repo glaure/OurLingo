@@ -1,5 +1,7 @@
 import { books } from './vocabulary'
 import type { Book } from './vocabulary'
+import { defaultWeeklyReport, normalizeWeeklyReport } from './weeklyReport'
+import type { WeeklyReportSettings } from './weeklyReport'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type UnitProgression = 'all' | 'completed-and-next'
@@ -13,6 +15,8 @@ export interface Settings {
   // Unit where "Completed + next" starts for each book, e.g. the unit the
   // class is on. Books without an entry start at Unit 1.
   startUnits: Partial<Record<Book, number>>
+  // Weekly learning report for up to two parents, set up in parent space.
+  weeklyReport: WeeklyReportSettings
 }
 
 export const settingsStorageKey = 'ourlingo.settings.v1'
@@ -26,6 +30,7 @@ export function defaultSettings(): Settings {
     books: [...books],
     progression: 'completed-and-next',
     startUnits: {},
+    weeklyReport: defaultWeeklyReport(),
   }
 }
 
@@ -72,6 +77,7 @@ export function normalizeSettings(value: unknown): Settings {
     books: preferred.length ? preferred : defaults.books,
     progression,
     startUnits,
+    weeklyReport: normalizeWeeklyReport(saved.weeklyReport),
   }
 }
 
@@ -108,7 +114,11 @@ export function saveSettings(settings: Settings): boolean {
 declare global {
   interface Window {
     // Provided by the Android app so system bar icons match the chosen theme.
-    OurLingoAndroid?: { setDarkTheme(dark: boolean): void }
+    OurLingoAndroid?: {
+      setDarkTheme(dark: boolean): void
+      // Opens the email app with a prepared message; false if there is none.
+      sendEmail?(to: string, subject: string, body: string): boolean
+    }
   }
 }
 

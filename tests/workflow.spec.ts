@@ -2133,3 +2133,148 @@ test('the word game is only offered for completed units', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Start practice' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Play the word game' })).toHaveCount(0)
 })
+
+test('parents set up the weekly report for at most two addresses @first-start', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('ourlingo.settings.v1')) return
+    localStorage.setItem(
+      'ourlingo.settings.v1',
+      JSON.stringify({ schemaVersion: 1, theme: 'system', books: ['MORE! 1'], knownBooks: ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'], progression: 'all' }),
+    )
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByText('Send a weekly learning report')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByLabel('Send a weekly learning report').check()
+  const first = page.getByLabel('Parent email')
+  const second = page.getByLabel('Second parent (optional)')
+  await first.fill('mum@example')
+  await second.focus()
+  await expect(page.getByRole('alert')).toContainText('"mum@example" is not a complete email address.')
+  await first.fill('mum@example.com')
+  await second.fill('dad@example.org')
+  await first.focus()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'Fridays', exact: true }).check()
+  await expect(page.locator('.report-emails input')).toHaveCount(2)
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('ourlingo.settings.v1')!).weeklyReport,
+  )
+  expect(saved.enabled).toBe(true)
+  expect(saved.emails).toEqual(['mum@example.com', 'dad@example.org'])
+  expect(saved.day).toBe('friday')
+  // Turning it on waits for the next report day, so there is no reminder yet.
+  await page.getByRole('button', { name: 'My units', exact: false }).click()
+  await expect(page.locator('.report-due')).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByLabel('Second parent (optional)')).toHaveValue('dad@example.org')
+})
+
+test('on the report day the app reminds and opens the email app with the report @first-start', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ entries }) => {
+      const sent: string[][] = []
+      ;(window as unknown as { sentEmails: string[][] }).sentEmails = sent
+      ;(window as unknown as { OurLingoAndroid: object }).OurLingoAndroid = {
+        setDarkTheme() {},
+        sendEmail(to: string, subject: string, body: string) {
+          sent.push([to, subject, body])
+          return true
+        },
+      }
+      if (sessionStorage.getItem('seeded')) return
+      sessionStorage.setItem('seeded', '1')
+      const day = (daysAgo: number) => {
+        const date = new Date()
+        date.setDate(date.getDate() - daysAgo)
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      }
+      localStorage.setItem(
+        'ourlingo.settings.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          theme: 'system',
+          books: ['MORE! 1'],
+          knownBooks: ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'],
+          progression: 'all',
+          weeklyReport: { enabled: true, emails: ['mum@example.com'], day: 'sunday', lastReport: day(20) },
+        }),
+      )
+      localStorage.setItem(
+        'ourlingo.activity.v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          rounds: 2,
+          perfectRounds: 0,
+          modes: ['typed'],
+          bestStreak: 1,
+          badges: {},
+          days: [
+            {
+              date: day(1),
+              rounds: 2,
+              answers: 20,
+              correct: 15,
+              learned: entries.slice(0, 2).map((entry: { english: string; german: string }) => ({ book: 'MORE! 1', unit: 1, ...entry })),
+            },
+          ],
+        }),
+      )
+    },
+    { entries: unit.entries.map(({ english, german }) => ({ english, german })) },
+  )
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const due = page.locator('.report-due')
+  await expect(due).toContainText("This week's learning report is ready.")
+  await expect(due).toContainText('mum@example.com')
+  await due.getByRole('button', { name: 'Send report' }).click()
+  await expect(due).toHaveCount(0)
+  const sent = await page.evaluate(() => (window as unknown as { sentEmails: string[][] }).sentEmails)
+  expect(sent).toHaveLength(1)
+  expect(sent[0][0]).toBe('mum@example.com')
+  expect(sent[0][1]).toMatch(/^OurLingo weekly report: /)
+  expect(sent[0][2]).toContain('Days practised: 1 of 7')
+  expect(sent[0][2]).toContain(`- ${unit.entries[0].english} = ${unit.entries[0].german}`)
+  await page.reload()
+  await expect(page.locator('.report-due')).toHaveCount(0)
+
+  // The report can also be read in parent space without sending it.
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await page.getByRole('button', { name: 'Learning report', exact: true }).click()
+  await expect(page.locator('.report-preview')).toContainText('Words learned this week: 2')
+  await expect(page.getByRole('button', { name: 'Send by email' })).toBeEnabled()
+})
+
+test('skipping a week hides the reminder until the next report day @first-start', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return
+    sessionStorage.setItem('seeded', '1')
+    localStorage.setItem(
+      'ourlingo.settings.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        theme: 'system',
+        books: ['MORE! 1'],
+        knownBooks: ['MORE! 1', 'MORE! 2', 'MORE! 3', 'MORE! 4'],
+        progression: 'all',
+        weeklyReport: { enabled: true, emails: ['mum@example.com'], day: 'friday', lastReport: '2020-01-03' },
+      }),
+    )
+  })
+  await page.goto('/')
+  await page.locator('.report-due').getByRole('button', { name: 'Not this week' }).click()
+  await expect(page.locator('.report-due')).toHaveCount(0)
+  await page.reload()
+  await expect(page.locator('.unit-card').first()).toBeVisible()
+  await expect(page.locator('.report-due')).toHaveCount(0)
+})

@@ -10,6 +10,7 @@ test('settings default to the system theme and every book', () => {
     books: [...books],
     progression: 'completed-and-next',
     startUnits: {},
+    weeklyReport: { enabled: false, emails: [], day: 'sunday', lastReport: null },
   })
   assert.deepEqual(normalizeSettings(null), defaultSettings())
   assert.deepEqual(normalizeSettings('broken'), defaultSettings())
@@ -28,6 +29,7 @@ test('settings keep a valid theme and preferred books in book order', () => {
       books: ['MORE! 1', 'MORE! 2'],
       progression: 'completed-and-next',
       startUnits: {},
+      weeklyReport: { enabled: false, emails: [], day: 'sunday', lastReport: null },
     },
   )
   assert.deepEqual(
@@ -43,6 +45,7 @@ test('settings keep a valid theme and preferred books in book order', () => {
       books: ['MORE! 2'],
       progression: 'completed-and-next',
       startUnits: {},
+      weeklyReport: { enabled: false, emails: [], day: 'sunday', lastReport: null },
     },
   )
 })

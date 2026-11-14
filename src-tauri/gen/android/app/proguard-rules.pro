@@ -19,7 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
-# Called from the web app by name; see MainActivity.SystemBars.
--keepclassmembers class com.ourlingo.app.MainActivity$SystemBars {
+# Called from the web app by name; see MainActivity.AppBridge.
+-keepclassmembers class com.ourlingo.app.MainActivity$AppBridge {
   @android.webkit.JavascriptInterface public <methods>;
 }

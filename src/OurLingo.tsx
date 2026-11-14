@@ -18,6 +18,9 @@ import {
   Link2,
   ListChecks,
   LoaderCircle,
+  Mail,
+  Copy,
+  Send,
   Lock,
   Plus,
   RotateCcw,
@@ -98,6 +101,18 @@ import {
 import type { Activity, Badge } from './activity'
 import { BadgeMedal, Confetti } from './Rewards'
 import WordGame from './WordGame'
+import {
+  buildWeeklyReport,
+  isEmailAddress,
+  mailtoLink,
+  maxReportEmails,
+  reportDate,
+  reportDays,
+  reportDue,
+  reportSubject,
+  reportText,
+} from './weeklyReport'
+import type { ReportDay, WeeklyReportSettings } from './weeklyReport'
 import type { GameResult } from './WordGame'
 import './OurLingo.css'
 
@@ -249,6 +264,11 @@ export default function OurLingo() {
   const [activity, setActivity] = useState<Activity>(loadActivity)
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
   const [gameOpen, setGameOpen] = useState(false)
+  const [emailDrafts, setEmailDrafts] = useState<string[]>(() => {
+    const saved = loadSettings().weeklyReport.emails
+    return [saved[0] ?? '', saved[1] ?? '']
+  })
+  const [emailError, setEmailError] = useState('')
   const [gamePlaying, setGamePlaying] = useState(false)
   const [unit, setUnit] = useState<VocabularyUnit | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -368,6 +388,8 @@ export default function OurLingo() {
     .filter((badge) => !badge.book || preferredBooks.includes(badge.book))
     .sort((a, b) => Number(isEarned(b)) - Number(isEarned(a)))
   const earnedBadges = shownBadges.filter(isEarned)
+  const weeklyReport = settings.weeklyReport
+  const weeklyReportDue = reportDue(weeklyReport, today)
   // With "Completed + next", each book shows its next locked unit as a goal.
   const lockedUnits = progressionActive
     ? preferredBooks.flatMap((book) => {
@@ -1123,6 +1145,66 @@ export default function OurLingo() {
     return awarded.earned
   }
 
+  function updateWeeklyReport(next: Partial<WeeklyReportSettings>) {
+    updateSettings({
+      ...settings,
+      weeklyReport: { ...weeklyReport, ...next },
+    })
+  }
+
+  function currentReport() {
+    return buildWeeklyReport(
+      library?.units ?? [],
+      learningProgress,
+      activity,
+      today,
+      preferredBooks,
+    )
+  }
+
+  // Saves the addresses typed so far; at most two, and only complete ones.
+  function commitEmails(drafts: string[]) {
+    const filled = drafts.map((draft) => draft.trim()).filter(Boolean)
+    const invalid = filled.find((draft) => !isEmailAddress(draft))
+    setEmailError(invalid ? `"${invalid}" is not a complete email address.` : '')
+    updateWeeklyReport({
+      emails: filled.filter(isEmailAddress).slice(0, maxReportEmails),
+    })
+  }
+
+  // Opens the email app with the report; someone still has to tap Send there.
+  function sendReport() {
+    if (!weeklyReport.emails.length) return
+    const report = currentReport()
+    const subject = reportSubject(report)
+    const android = window.OurLingoAndroid
+    if (android?.sendEmail) {
+      const opened = android.sendEmail(
+        weeklyReport.emails.join(','),
+        subject,
+        reportText(report, 200),
+      )
+      if (!opened) {
+        setWarning(
+          'No email app was found on this device. Use "Copy report" and paste it into a message instead.',
+        )
+        return
+      }
+    } else
+      window.location.assign(
+        mailtoLink(weeklyReport.emails, subject, reportText(report)),
+      )
+    updateWeeklyReport({ lastReport: reportDate(today, weeklyReport.day) })
+  }
+
+  function copyReport() {
+    const report = currentReport()
+    navigator.clipboard
+      ?.writeText(`${reportSubject(report)}\n\n${reportText(report, 200)}`)
+      .then(() => setMessage('The report was copied. Paste it into a message.'))
+      .catch(() => setWarning('The report could not be copied on this device.'))
+  }
+
   // Every word appears on exactly one board, so its first try decides its score.
   function finishMatchingBoard() {
     if (!boardComplete) return
@@ -1612,6 +1694,31 @@ export default function OurLingo() {
                   </button>
                 </form>
               )}
+              {weeklyReportDue && (
+                <div className="report-due" role="status">
+                  <Mail size={20} />
+                  <span>
+                    <strong>This week's learning report is ready.</strong> It
+                    goes to {weeklyReport.emails.join(' and ')}.
+                  </span>
+                  <div>
+                    <button className="button primary" onClick={sendReport}>
+                      <Send size={16} />
+                      Send report
+                    </button>
+                    <button
+                      className="button text-button"
+                      onClick={() =>
+                        updateWeeklyReport({
+                          lastReport: reportDate(today, weeklyReport.day),
+                        })
+                      }
+                    >
+                      Not this week
+                    </button>
+                  </div>
+                </div>
+              )}
               {space === 'kid' && (
                 <button
                   type="button"
@@ -1934,10 +2041,112 @@ export default function OurLingo() {
                   </div>
                 )}
               </fieldset>
+              {space === 'parent' && (
+                <fieldset className="settings-group weekly-report-settings">
+                  <legend>Weekly report</legend>
+                  <p>
+                    Once a week OurLingo prepares a learning report on this
+                    device and reminds you to send it. It opens your email app
+                    with the report filled in, and you tap Send. Nothing is sent
+                    automatically. At most two addresses.
+                  </p>
+                  <label className="report-toggle">
+                    <input
+                      type="checkbox"
+                      checked={weeklyReport.enabled}
+                      onChange={(event) =>
+                        updateWeeklyReport({
+                          enabled: event.target.checked,
+                          // The first reminder comes on the next report day.
+                          lastReport: event.target.checked
+                            ? reportDate(today, weeklyReport.day)
+                            : weeklyReport.lastReport,
+                        })
+                      }
+                    />
+                    Send a weekly learning report
+                  </label>
+                  <div className="report-emails">
+                    {[0, 1].map((index) => (
+                      <label key={index}>
+                        {index === 0 ? 'Parent email' : 'Second parent (optional)'}
+                        <input
+                          id={`report-email-${index}`}
+                          type="email"
+                          inputMode="email"
+                          autoComplete="email"
+                          value={emailDrafts[index]}
+                          placeholder="name@example.com"
+                          onChange={(event) =>
+                            setEmailDrafts((previous) =>
+                              previous.map((draft, other) =>
+                                other === index ? event.target.value : draft,
+                              ),
+                            )
+                          }
+                          onBlur={() => commitEmails(emailDrafts)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {emailError && (
+                    <p className="field-error" role="alert">
+                      {emailError}
+                    </p>
+                  )}
+                  <div className="segmented report-day">
+                    {reportDays.map((day: ReportDay) => (
+                      <label
+                        key={day}
+                        className={weeklyReport.day === day ? 'selected' : ''}
+                      >
+                        <input
+                          type="radio"
+                          name="report-day"
+                          value={day}
+                          checked={weeklyReport.day === day}
+                          onChange={() =>
+                            updateWeeklyReport({
+                              day,
+                              lastReport: reportDate(today, day),
+                            })
+                          }
+                        />
+                        {day === 'friday' ? 'Fridays' : 'Sundays'}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
             </section>
           )}
           {library && space === 'parent' && view === 'report' && (
             <section className="learning-report" aria-label="Learning report">
+              <section className="this-week" aria-label="This week">
+                <div className="this-week-heading">
+                  <h2>This week</h2>
+                  <div>
+                    <button
+                      className="button primary"
+                      disabled={!weeklyReport.emails.length}
+                      onClick={sendReport}
+                    >
+                      <Send size={16} />
+                      Send by email
+                    </button>
+                    <button className="button secondary" onClick={copyReport}>
+                      <Copy size={16} />
+                      Copy report
+                    </button>
+                  </div>
+                </div>
+                {!weeklyReport.emails.length && (
+                  <p className="report-note">
+                    Add a parent email address in Settings to send this report.
+                  </p>
+                )}
+                <pre className="report-preview">{reportText(currentReport(), 200)}</pre>
+              </section>
               <p className="report-note">
                 Progress is private to this device. A word is known after three
                 correct first attempts in a row; any miss resets its streak.
