@@ -74,6 +74,7 @@ Current features:
 - `tsconfig.node.json`: checks both test suites and Playwright configuration using Node and DOM types.
 - `public/data/`: twenty-four supplied workbook datasets.
 - `web/service-worker.js`, the `serviceWorker()` plugin in `vite.config.ts`, `public/manifest.webmanifest` and `public/pwa/`: web app for iOS on GitHub Pages (`npm run build:web`, deployed by `.github/workflows/pages.yml`).
+- `src/avatar.ts` and `src/AvatarEditor.tsx`: the avatar (issue #3): drawing, choices, reward unlocks and the editor.
 - `README.md`: current features, startup instructions and storage limitations.
 
 Original Vite starter files such as `src/App.tsx`, `src/App.css` and `src/index.css` remain unused. Do not confuse them with the active implementation or remove them as unrelated cleanup during packaging.

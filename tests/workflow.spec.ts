@@ -1733,6 +1733,9 @@ test('first start asks for the book, mentions Settings and defaults to completed
   ).toBe(true)
   await start.click()
   await expect(welcome).toHaveCount(0)
+  // Next the app offers to create an avatar, which can be skipped.
+  await expect(page.getByRole('heading', { name: 'Create your avatar' })).toBeVisible()
+  await page.getByRole('button', { name: 'Skip for now' }).click()
   await expect(page.getByText('MORE! 2 · English / Deutsch')).toBeVisible()
   await expect(page.locator('.unit-card:not(.locked)')).toHaveCount(2)
   await expect(
@@ -1895,6 +1898,7 @@ test('the last missing word comes first, completes the unit and unlocks the next
     await page.getByRole('button', { name: /Next word|See results/ }).click()
   }
   await expect(page.getByText('Unit 1 completed!')).toBeVisible()
+  await expect(page.locator('.result-avatar')).toBeVisible()
   await expect(page.getByText('MORE! 1 Unit 2 is unlocked.')).toBeVisible()
   await expect(page.getByLabel('Words you now know')).toContainText(
     lastWord.english,
@@ -2000,6 +2004,7 @@ test('a class that is further on starts at its unit and keeps earlier units to p
   await expect(welcome.getByText('Which unit is your class on?')).toBeVisible()
   await welcome.getByLabel('MORE! 2 start unit').selectOption('5')
   await welcome.getByRole('button', { name: "Let's start" }).click()
+  await page.getByRole('button', { name: 'Skip for now' }).click()
 
   const cards = page.locator('.library-section > .unit-grid > .unit-card:not(.locked)')
   await expect(cards).toHaveCount(2)
@@ -2277,4 +2282,80 @@ test('skipping a week hides the reminder until the next report day @first-start'
   await page.reload()
   await expect(page.locator('.unit-card').first()).toBeVisible()
   await expect(page.locator('.report-due')).toHaveCount(0)
+})
+
+test('children create an avatar, rewards unlock with badges, and it shows around the app', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('seeded')) return
+    sessionStorage.setItem('seeded', '1')
+    localStorage.setItem(
+      'ourlingo.activity.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        rounds: 1,
+        perfectRounds: 0,
+        modes: ['typed'],
+        bestStreak: 1,
+        badges: { 'game-first': '2026-11-10' },
+        days: [],
+        games: { played: 1, bestPairs: 4, bestCombo: 2, records: {} },
+      }),
+    )
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'My avatar' }).click()
+  await expect(page.getByRole('heading', { name: 'Create your avatar' })).toBeVisible()
+  const preview = page.getByRole('img', { name: 'Your avatar' })
+  const before = await preview.getAttribute('src')
+
+  await page.getByRole('tab', { name: 'Hair' }).click()
+  await page.getByRole('button', { name: 'Braids', exact: true }).click()
+  await page.getByRole('button', { name: 'Hair colour 8' }).click()
+  await page.getByRole('tab', { name: 'Clothes' }).click()
+  await page.getByRole('button', { name: 'Denim jacket', exact: true }).click()
+  await expect(page.getByText('This top has no prints.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hearts', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Sequins, locked' })).toBeDisabled()
+  await expect(page.getByText('Sequins: Badge "Word collector": know 50 words')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Extras' }).click()
+  // "Game on!" was earned, so the headphones are unlocked; the crown is not.
+  await page.getByRole('button', { name: 'Headphones', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Yes, locked' })).toBeDisabled()
+  expect(await preview.getAttribute('src')).not.toBe(before)
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('ourlingo.avatar.v1')!))
+  expect(saved).toMatchObject({ hair: 'braids', hairColor: '#2fa38c', clothes: 'denim', pattern: 'none', hairAccessory: 'headphones' })
+  await page.getByRole('button', { name: "That's me!" }).click()
+  await expect(page.locator('.unit-card').first()).toBeVisible()
+  const header = await page.getByRole('button', { name: 'My avatar' }).locator('img').getAttribute('src')
+  expect(decodeURIComponent(header!)).toContain('#2fa38c')
+
+  await page.reload()
+  await page.getByRole('button', { name: 'Trophies', exact: true }).click()
+  await expect(page.locator('.trophy-avatar img')).toHaveAttribute('src', header!)
+  await page.getByRole('button', { name: 'Change my avatar' }).click()
+  await expect(page.getByRole('heading', { name: 'Create your avatar' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Surprise me' }).click()
+  const surprise = await page.evaluate(() => JSON.parse(localStorage.getItem('ourlingo.avatar.v1')!))
+  expect(surprise.crown).toBe('no')
+  expect(['none', 'headphones', 'bow', 'clip', 'headband', 'beanie']).toContain(surprise.hairAccessory)
+
+  await page.getByRole('button', { name: 'Parent space', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'My avatar' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Learning report', exact: true }).click()
+  await expect(page.locator('.report-avatar')).toBeVisible()
+})
+
+test('a damaged saved avatar falls back to the default avatar', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ourlingo.avatar.v1', '{"hair": "mohawk", "skin": 99')
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'My avatar' }).click()
+  await expect(page.getByRole('img', { name: 'Your avatar' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Create your avatar' })).toBeVisible()
 })

@@ -101,6 +101,15 @@ import {
 import type { Activity, Badge } from './activity'
 import { BadgeMedal, Confetti } from './Rewards'
 import WordGame from './WordGame'
+import AvatarEditor from './AvatarEditor'
+import {
+  avatarImage,
+  cheering,
+  defaultAvatar,
+  loadAvatar,
+  saveAvatar,
+} from './avatar'
+import type { Avatar } from './avatar'
 import {
   buildWeeklyReport,
   isEmailAddress,
@@ -123,6 +132,7 @@ type View =
   | 'report'
   | 'settings'
   | 'trophies'
+  | 'avatar'
 type Direction = PracticeDirection
 type MatchingSide = 'english' | 'german'
 type PracticeMode = 'typed' | 'multiple-choice' | 'matching'
@@ -264,6 +274,10 @@ export default function OurLingo() {
   const [activity, setActivity] = useState<Activity>(loadActivity)
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null)
   const [gameOpen, setGameOpen] = useState(false)
+  const [avatar, setAvatar] = useState<Avatar>(() => loadAvatar() ?? defaultAvatar())
+  const [avatarSaved, setAvatarSaved] = useState(() => loadAvatar() !== null)
+  // The editor greets with "Create your avatar" until it is closed once.
+  const [avatarIntro, setAvatarIntro] = useState(false)
   const [emailDrafts, setEmailDrafts] = useState<string[]>(() => {
     const saved = loadSettings().weeklyReport.emails
     return [saved[0] ?? '', saved[1] ?? '']
@@ -388,6 +402,8 @@ export default function OurLingo() {
     .filter((badge) => !badge.book || preferredBooks.includes(badge.book))
     .sort((a, b) => Number(isEarned(b)) - Number(isEarned(a)))
   const earnedBadges = shownBadges.filter(isEarned)
+  // Every earned badge, also for books that are not shown, unlocks avatar parts.
+  const earnedIds = new Set(badges.filter(isEarned).map((badge) => badge.id))
   const weeklyReport = settings.weeklyReport
   const weeklyReportDue = reportDue(weeklyReport, today)
   // With "Completed + next", each book shows its next locked unit as a goal.
@@ -892,6 +908,8 @@ export default function OurLingo() {
     })
     setBookFilter('all')
     setFirstStart(false)
+    setAvatarIntro(!avatarSaved)
+    setView('avatar')
   }
 
   function goTo(next: View) {
@@ -1143,6 +1161,18 @@ export default function OurLingo() {
       setWarning('The game finished, but the record could not be saved on this device.')
     }
     return awarded.earned
+  }
+
+  function openAvatar() {
+    setAvatarIntro(!avatarSaved)
+    goTo('avatar')
+  }
+
+  function changeAvatar(next: Avatar) {
+    setAvatar(next)
+    setAvatarSaved(true)
+    if (!saveAvatar(next))
+      setWarning('Your avatar could not be saved on this device.')
   }
 
   function updateWeeklyReport(next: Partial<WeeklyReportSettings>) {
@@ -1460,7 +1490,9 @@ export default function OurLingo() {
                     ? 'Settings'
                     : view === 'trophies'
                       ? 'Trophies'
-                      : unit ? unitLabel(unit) : 'Your units'}
+                      : view === 'avatar'
+                        ? 'My avatar'
+                        : unit ? unitLabel(unit) : 'Your units'}
             </strong>
           </div>
           <div className="topbar-actions">
@@ -1476,6 +1508,17 @@ export default function OurLingo() {
                   <ArrowDownToLine size={19} />
                 </button>
               </>
+            )}
+            {space === 'kid' && (
+              <button
+                type="button"
+                className="avatar-button"
+                aria-label="My avatar"
+                title="My avatar"
+                onClick={openAvatar}
+              >
+                <img src={avatarImage(avatar, earnedIds)} alt="" />
+              </button>
             )}
             <button
               className="button secondary space-switch"
@@ -1507,7 +1550,9 @@ export default function OurLingo() {
                         ? 'Settings'
                         : view === 'trophies'
                           ? 'My trophies'
-                          : 'A little practice'}
+                          : view === 'avatar'
+                            ? 'My avatar'
+                            : 'A little practice'}
               </h1>
               <p>
                 {view === 'library'
@@ -1530,7 +1575,9 @@ export default function OurLingo() {
                       ? 'Saved on this device'
                       : view === 'trophies'
                         ? 'A little practice every day goes a long way'
-                        : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
+                        : view === 'avatar'
+                          ? 'Saved on this device'
+                          : `${unit?.book} · ${unit ? unitLabel(unit) : 'Your unit'}`}
               </p>
             </div>
             {unitView && (
@@ -1564,7 +1611,7 @@ export default function OurLingo() {
               <span>{message}</span>
             </div>
           )}
-          {!library && !loadError && (
+          {!library && !loadError && view !== 'avatar' && (
             <div className="empty-state">
               <LoaderCircle className="spin" size={28} />
               <h2>Opening your vocabulary...</h2>
@@ -1804,8 +1851,28 @@ export default function OurLingo() {
               )}
             </section>
           )}
+          {view === 'avatar' && (
+            <AvatarEditor
+              avatar={avatar}
+              earned={earnedIds}
+              firstTime={avatarIntro}
+              onChange={changeAvatar}
+              onDone={() => goTo('library')}
+            />
+          )}
           {library && view === 'trophies' && (
             <section className="trophies" aria-label="Trophies">
+              <div className="trophy-avatar">
+                <img src={avatarImage(avatar, earnedIds)} alt="Your avatar" />
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={openAvatar}
+                >
+                  <Sparkles size={16} />
+                  {avatarSaved ? 'Change my avatar' : 'Create my avatar'}
+                </button>
+              </div>
               <div className={`streak-card ${practisedToday ? 'today' : ''}`}>
                 <span className="streak-flame">
                   <Flame size={38} />
@@ -2124,6 +2191,11 @@ export default function OurLingo() {
             <section className="learning-report" aria-label="Learning report">
               <section className="this-week" aria-label="This week">
                 <div className="this-week-heading">
+                  <img
+                    className="report-avatar"
+                    src={avatarImage(avatar, earnedIds)}
+                    alt=""
+                  />
                   <h2>This week</h2>
                   <div>
                     <button
@@ -2976,6 +3048,11 @@ export default function OurLingo() {
               {complete && (
                 <div className="practice-results">
                   {stars >= 2 && <Confetti />}
+                  <img
+                    className="result-avatar"
+                    src={avatarImage(stars >= 2 ? cheering(avatar) : avatar, earnedIds)}
+                    alt=""
+                  />
                   <div
                     className="result-stars"
                     role="img"
